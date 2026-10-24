@@ -3,6 +3,8 @@ package jp.mobgits.lab.feature.collaboration
 import jp.mobgits.lab.*
 import jp.mobgits.lab.core.network.*
 import org.json.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** All routes carry account scope and GitLab's project-local IID, never a token. */
 data class Destination(val kind: String = "home", val project: Long = 0, val id: Long = 0, val path: String = "", val ref: String = "main") {
@@ -25,7 +27,7 @@ class CollaborationUseCase(private val data: Resources) {
         "project" -> root(d)
         else -> error("Unknown detail")
     }
-    suspend fun list(account: String, d: Destination, page: Int, filter: ListFilter = ListFilter()): EntityPage {
+    suspend fun list(account: String, d: Destination, page: Int, filter: ListFilter = ListFilter()): EntityPage = withContext(Dispatchers.Default) {
         require(page > 0)
         val endpoint = when (d.kind) {
             "home", "projects" -> "/api/v4/projects?membership=true&simple=true&order_by=last_activity_at"
@@ -49,14 +51,14 @@ class CollaborationUseCase(private val data: Resources) {
         }
         val response = data.read(account, "$endpoint&per_page=${if (d.kind == "diffs") 1 else 20}&page=$page")
         val values = JSONArray(response.json).objects()
-        return EntityPage(values, response.nextPage ?: if (values.size == (if (d.kind == "diffs") 1 else 20)) page + 1 else null, response.offline)
+        return@withContext EntityPage(values, response.nextPage ?: if (values.size == (if (d.kind == "diffs") 1 else 20)) page + 1 else null, response.offline)
     }
     suspend fun checkApi(account: String) { data.read(account, "/api/v4/user", cached = false) }
-    suspend fun detail(account: String, d: Destination) = data.read(account, entityPath(d)).let { Detail(JSONObject(it.json), it.offline) }
+    suspend fun detail(account: String, d: Destination) = withContext(Dispatchers.Default) { data.read(account, entityPath(d)).let { Detail(JSONObject(it.json), it.offline) } }
     suspend fun file(account: String, d: Destination) = data.read(account, "${root(d)}/repository/files/${query(d.path)}/raw?ref=${query(d.ref)}")
-    suspend fun save(account: String, d: Destination, fields: Map<String, String>, create: Boolean = false): JSONObject {
+    suspend fun save(account: String, d: Destination, fields: Map<String, String>, create: Boolean = false): JSONObject = withContext(Dispatchers.Default) {
         val path = if (create) "${root(d)}/issues" else entityPath(d)
-        return JSONObject(data.write(account, path, if (create) "POST" else "PUT", fields))
+        return@withContext JSONObject(data.write(account, path, if (create) "POST" else "PUT", fields))
     }
     suspend fun comment(account: String, d: Destination, body: String, discussionId: String? = null, position: ReviewPosition? = null) {
         require(body.isNotBlank())
@@ -71,7 +73,7 @@ class CollaborationUseCase(private val data: Resources) {
     suspend fun resolve(account: String, d: Destination, discussion: String, resolved: Boolean) {
         data.write(account, "${entityPath(d)}/discussions/${query(discussion)}", "PUT", mapOf("resolved" to resolved.toString()))
     }
-    suspend fun approval(account: String, d: Destination) = data.read(account, "${entityPath(d)}/approvals").let { Detail(JSONObject(it.json), it.offline) }
+    suspend fun approval(account: String, d: Destination) = withContext(Dispatchers.Default) { data.read(account, "${entityPath(d)}/approvals").let { Detail(JSONObject(it.json), it.offline) } }
     suspend fun review(account: String, d: Destination, reviewed: DiffRefs, action: String, approvalPassword: String? = null) {
         require(action in setOf("approve", "unapprove", "merge"))
         val latest = detail(account, d)
@@ -81,9 +83,9 @@ class CollaborationUseCase(private val data: Resources) {
         if (action == "merge") check(!latest.value.optBoolean("draft") && latest.value.text("detailed_merge_status") == "mergeable") { "マージ条件が揃っていません" }
         data.write(account, "${entityPath(d)}/$action", if (action == "merge") "PUT" else "POST", mapOf("sha" to reviewed.head) + if (action == "approve" && approvalPassword != null) mapOf("approval_password" to approvalPassword) else emptyMap())
     }
-    suspend fun jobAction(account: String, d: Destination, action: String): JSONObject {
+    suspend fun jobAction(account: String, d: Destination, action: String): JSONObject = withContext(Dispatchers.Default) {
         require(action in setOf("retry", "cancel"))
-        return JSONObject(data.write(account, "${entityPath(d)}/$action", "POST"))
+        return@withContext JSONObject(data.write(account, "${entityPath(d)}/$action", "POST"))
     }
     suspend fun log(account: String, d: Destination, offset: Long) = data.log(account, d.project, d.id, offset)
     suspend fun done(account: String, id: Long) { data.write(account, "/api/v4/todos/$id/mark_as_done", "POST") }
