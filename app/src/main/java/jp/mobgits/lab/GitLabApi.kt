@@ -91,6 +91,29 @@ class GitLabApi {
         }
     }
 
+    suspend fun pipelineJobs(auth: StoredAuth, projectId: Long, pipelineId: Long): List<GitLabJob> = withContext(Dispatchers.IO) {
+        buildList {
+            var page = 1
+            do {
+                val batch = JSONArray(get(auth, "/api/v4/projects/$projectId/pipelines/$pipelineId/jobs?per_page=100&page=$page"))
+                addAll(batch.mapObjects { jobFromJson(it) })
+                page++
+            } while (batch.length() == 100)
+        }
+    }
+
+    suspend fun jobTrace(auth: StoredAuth, projectId: Long, jobId: Long): String = withContext(Dispatchers.IO) {
+        get(auth, "/api/v4/projects/$projectId/jobs/$jobId/trace")
+    }
+
+    suspend fun jobAction(auth: StoredAuth, projectId: Long, jobId: Long, action: JobAction): GitLabJob = withContext(Dispatchers.IO) {
+        jobFromJson(JSONObject(request(auth, "/api/v4/projects/$projectId/jobs/$jobId/${action.path}", "POST")))
+    }
+
+    private fun jobFromJson(json: JSONObject) = GitLabJob(
+        json.getLong("id"), json.optString("name"), json.optString("stage"), json.optString("status")
+    )
+
     suspend fun repositoryTree(auth: StoredAuth, projectId: Long, path: String = "", ref: String? = null): List<GitLabTreeItem> = withContext(Dispatchers.IO) {
         val encodedPath = URLEncoder.encode(path, Charsets.UTF_8.name())
         val refPart = ref?.takeIf { it.isNotBlank() }?.let { "&ref=${URLEncoder.encode(it, Charsets.UTF_8.name())}" }.orEmpty()
@@ -126,6 +149,7 @@ class GitLabApi {
     private fun request(auth: StoredAuth, path: String, method: String): String {
         val normalized = normalizeBaseUrl(auth.baseUrl)
         val connection = (URL(normalized + path).openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = false
             requestMethod = method
             connectTimeout = 15_000
             readTimeout = 25_000

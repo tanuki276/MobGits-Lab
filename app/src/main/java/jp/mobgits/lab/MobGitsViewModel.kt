@@ -209,8 +209,62 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private var ciRequest = 0
+
+    fun openPipeline(pipeline: GitLabPipeline) {
+        val auth = state.auth ?: return
+        val project = state.selectedProject ?: return
+        val request = ++ciRequest
+        state = state.copy(selectedPipeline = pipeline, selectedJob = null, jobs = emptyList(), jobLog = null, ciLoading = true)
+        viewModelScope.launch {
+            runCatching { api.pipelineJobs(freshAuth(auth), project.id, pipeline.id) }
+                .onSuccess { if (request == ciRequest) state = state.copy(jobs = it, ciLoading = false) }
+                .onFailure { if (request == ciRequest) state = state.copy(ciLoading = false, error = it.message) }
+        }
+    }
+
+    fun openJob(job: GitLabJob) {
+        val auth = state.auth ?: return
+        val project = state.selectedProject ?: return
+        val request = ++ciRequest
+        state = state.copy(selectedJob = job, jobLog = null, ciLoading = true)
+        viewModelScope.launch {
+            runCatching { api.jobTrace(freshAuth(auth), project.id, job.id) }
+                .onSuccess { if (request == ciRequest) state = state.copy(jobLog = it, ciLoading = false) }
+                .onFailure { if (request == ciRequest) state = state.copy(ciLoading = false, error = it.message) }
+        }
+    }
+
+    fun runJobAction(action: JobAction) {
+        if (state.ciLoading) return
+        val auth = state.auth ?: return
+        val project = state.selectedProject ?: return
+        val job = state.selectedJob ?: return
+        if (!job.allows(action)) return
+        val request = ++ciRequest
+        state = state.copy(ciLoading = true)
+        viewModelScope.launch {
+            runCatching { api.jobAction(freshAuth(auth), project.id, job.id, action) }
+                .onSuccess { updated ->
+                    if (request == ciRequest) {
+                        state = state.copy(ciLoading = false, selectedJob = updated)
+                        openJob(updated)
+                    }
+                }
+                .onFailure { if (request == ciRequest) state = state.copy(ciLoading = false, error = it.message) }
+        }
+    }
+
+    fun backFromCi() {
+        ciRequest++
+        val pipeline = state.selectedPipeline
+        if (state.selectedJob != null && pipeline != null) openPipeline(pipeline)
+        else state = state.copy(selectedPipeline = null, selectedJob = null, ciLoading = false)
+    }
+
     fun closeProject() {
-        state = state.copy(selectedProject = null, openedFile = null, fileContent = null)
+        ciRequest++
+        state = state.copy(selectedProject = null, openedFile = null, fileContent = null, selectedPipeline = null, selectedJob = null, jobs = emptyList(), jobLog = null, ciLoading = false)
     }
 
     fun closeFile() {
@@ -218,6 +272,7 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun logout() {
+        ciRequest++
         tokenStore.clear()
         pendingOAuth = null
         state = AppState()
@@ -234,6 +289,11 @@ private data class ProjectData(val issues: List<GitLabIssue>, val mergeRequests:
 enum class RootScreen { HOME, INBOX, PROJECTS, SEARCH, PROFILE }
 
 data class AppState(
+    val selectedPipeline: GitLabPipeline? = null,
+    val selectedJob: GitLabJob? = null,
+    val jobs: List<GitLabJob> = emptyList(),
+    val jobLog: String? = null,
+    val ciLoading: Boolean = false,
     val auth: StoredAuth? = null,
     val user: GitLabUser? = null,
     val projects: List<GitLabProject> = emptyList(),

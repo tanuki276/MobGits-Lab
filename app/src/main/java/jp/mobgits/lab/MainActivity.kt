@@ -3,6 +3,8 @@ package jp.mobgits.lab
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -258,6 +260,11 @@ private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobG
     var tab by remember { mutableIntStateOf(0) }
     val tabs = listOf("コード", "Issue", "MR", "CI/CD")
 
+    if (state.selectedPipeline != null) {
+        CiDetailScreen(state, snackbar, vm)
+        return
+    }
+
     if (state.openedFile != null) {
         Scaffold(
             topBar = {
@@ -299,7 +306,7 @@ private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobG
                     0 -> RepositoryScreen(state, vm::openDirectory, vm::openFile)
                     1 -> IssueList(state.issues)
                     2 -> MergeRequestList(state.mergeRequests)
-                    else -> PipelineList(state.pipelines)
+                    else -> PipelineList(state.pipelines, vm::openPipeline)
                 }
                 if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
             }
@@ -356,10 +363,10 @@ private fun MergeRequestList(items: List<GitLabMergeRequest>) {
 }
 
 @Composable
-private fun PipelineList(items: List<GitLabPipeline>) {
+private fun PipelineList(items: List<GitLabPipeline>, open: (GitLabPipeline) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(items, key = { it.id }) { pipeline ->
-            Card(Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Card(Modifier.fillMaxWidth().clickable { open(pipeline) }) { Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column { Text("Pipeline #${pipeline.id}", fontWeight = FontWeight.SemiBold); Text(pipeline.ref) }
                 Text(pipeline.status.uppercase(), fontWeight = FontWeight.Bold)
             } }
@@ -385,4 +392,69 @@ private fun rootTitle(screen: RootScreen) = when (screen) {
     RootScreen.PROJECTS -> "プロジェクト"
     RootScreen.SEARCH -> "検索"
     RootScreen.PROFILE -> "プロフィール"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CiDetailScreen(state: AppState, snackbar: SnackbarHostState, vm: MobGitsViewModel) {
+    val pipeline = state.selectedPipeline ?: return
+    val job = state.selectedJob
+    var confirm by remember(job?.id) { mutableStateOf<JobAction?>(null) }
+    BackHandler { vm.backFromCi() }
+    confirm?.let { action ->
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text("Job #${job?.id} を${action.label}しますか？") },
+            text = { Text("GitLab上のジョブに反映されます。") },
+            confirmButton = { TextButton(onClick = { confirm = null; vm.runJobAction(action) }) { Text(action.label) } },
+            dismissButton = { TextButton(onClick = { confirm = null }) { Text("戻る") } }
+        )
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(job?.name ?: "Pipeline #${pipeline.id}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = { IconButton(onClick = vm::backFromCi) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
+                actions = {
+                    IconButton(enabled = !state.ciLoading, onClick = { if (job == null) vm.openPipeline(pipeline) else vm.openJob(job) }) {
+                        Icon(Icons.Default.Refresh, "更新")
+                    }
+                }
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbar) }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (state.ciLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (job == null) {
+                if (!state.ciLoading && state.jobs.isEmpty()) Text("ジョブがありません。更新して再試行できます。", Modifier.padding(16.dp))
+                LazyColumn {
+                    items(state.jobs, key = { it.id }) { item ->
+                        ListItem(
+                            headlineContent = { Text(item.name) },
+                            supportingContent = { Text("${item.stage} · ${item.status} · #${item.id}") },
+                            modifier = Modifier.clickable(enabled = !state.ciLoading) { vm.openJob(item) }
+                        )
+                        HorizontalDivider()
+                    }
+                }
+            } else {
+                Text("${job.stage} · ${job.status} · #${job.id}", Modifier.padding(16.dp))
+                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    JobAction.entries.filter { job.allows(it) }.forEach { action ->
+                        OutlinedButton(enabled = !state.ciLoading, onClick = { confirm = action }) { Text(action.label) }
+                    }
+                }
+                SelectionContainer {
+                    LazyColumn(Modifier.fillMaxSize().padding(16.dp)) {
+                        val lines = state.jobLog?.lineSequence()?.toList().orEmpty()
+                        if (lines.isEmpty() && !state.ciLoading) item { Text("ログがありません。更新して再試行できます。") }
+                        items(lines.size) { index ->
+                            Text(lines[index], fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
