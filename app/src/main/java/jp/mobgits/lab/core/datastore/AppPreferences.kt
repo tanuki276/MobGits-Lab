@@ -10,7 +10,7 @@ import org.json.*
 
 private val Context.mobPreferences by preferencesDataStore("mobgits_preferences_v3")
 data class DisplaySettings(val theme: String = "system", val dynamic: Boolean = true, val biometric: Boolean = false,
-    val todos: Boolean = false, val mr: Boolean = true, val pipeline: Boolean = true)
+    val enabled: Boolean = false, val todos: Boolean = true, val mr: Boolean = true, val pipeline: Boolean = true)
 
 class AppPreferences(context: Context) : AccountRepository {
     private val store = context.applicationContext.mobPreferences
@@ -18,9 +18,9 @@ class AppPreferences(context: Context) : AccountRepository {
     override val directory: Flow<AccountDirectory> = store.data.map { decode(it[directoryKey]) }.distinctUntilChanged()
     val settings = store.data.map { p -> DisplaySettings(p[stringPreferencesKey("theme")] ?: "system",
         p[booleanPreferencesKey("dynamic")] ?: true, p[booleanPreferencesKey("biometric")] ?: false,
-        p[booleanPreferencesKey("todos")] ?: false, p[booleanPreferencesKey("mr")] ?: true, p[booleanPreferencesKey("pipeline")] ?: true) }
+        p[booleanPreferencesKey("enabled")] ?: false, p[booleanPreferencesKey("todos")] ?: true, p[booleanPreferencesKey("mr")] ?: true, p[booleanPreferencesKey("pipeline")] ?: true) }
     suspend fun setFlag(key: String, value: Boolean) {
-        require(key in setOf("dynamic", "biometric", "todos", "mr", "pipeline"))
+        require(key in setOf("dynamic", "biometric", "enabled", "todos", "mr", "pipeline"))
         store.edit { it[booleanPreferencesKey(key)] = value }
     }
     suspend fun theme(value: String) { require(value in setOf("system", "light", "dark")); store.edit { it[stringPreferencesKey("theme")] = value } }

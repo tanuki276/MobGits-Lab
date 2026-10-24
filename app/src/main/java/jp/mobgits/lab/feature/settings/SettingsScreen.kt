@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import jp.mobgits.lab.*
 import jp.mobgits.lab.feature.auth.AuthScreen
@@ -35,8 +37,10 @@ fun SettingsScreen(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean
             Text("GitLab", style = MaterialTheme.typography.titleLarge)
             val server = state.directory.activeAccount?.let { a -> state.directory.servers.find { it.id == a.serverId } }
             Text(server?.baseUrl.orEmpty()); Text("OAuth: ${when(state.session) { is jp.mobgits.lab.core.auth.SessionStatus.Authenticated -> "認証済み"; is jp.mobgits.lab.core.auth.SessionStatus.ReauthenticationRequired -> "再認証が必要"; is jp.mobgits.lab.core.auth.SessionStatus.TemporarilyUnavailable -> "通信待ち"; else -> "未認証" }}"); Text("API: ${state.apiStatus}")
+            TextButton(onClick = vm::checkApi, enabled = state.apiStatus != "確認中") { Text("接続を確認") }
             Text("通知", style = MaterialTheme.typography.titleLarge)
-            SettingToggle("To-Do通知", state.settings.todos, notifications)
+            SettingToggle("Android通知", state.settings.enabled, notifications)
+            SettingToggle("To-Do（Issue・その他）", state.settings.todos) { vm.flag("todos", it) }
             SettingToggle("MR通知", state.settings.mr) { vm.flag("mr", it) }
             SettingToggle("Pipeline通知", state.settings.pipeline) { vm.flag("pipeline", it) }
             Text("表示", style = MaterialTheme.typography.titleLarge)
@@ -51,7 +55,7 @@ fun SettingsScreen(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean
             if (developer) {
                 Text("API endpoint: ${server?.apiBaseUrl.orEmpty()}")
                 Text("Debug logging: 無効（認証情報・repository本文を記録しません）")
-                TextButton(onClick = { open("https://github.com/tanuki276/MobGits-Lab/blob/feat/cr1-plan/docs/reference-repositories.yaml") }) { Text("Reference repositories") }
+                TextButton(onClick = { open("https://github.com/tanuki276/MobGits-Lab/blob/cr/1-foundation/docs/reference-repositories.yaml") }) { Text("Reference repositories") }
             }
             Text("MobGits Lab ${BuildConfig.VERSION_NAME}")
             Text("アプリのライセンス: 未設定（リリース前に確定）")
@@ -61,5 +65,5 @@ fun SettingsScreen(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean
     }
 }
 @Composable private fun SettingToggle(label: String, checked: Boolean, change: (Boolean) -> Unit) {
-    ListItem(headlineContent = { Text(label) }, trailingContent = { Switch(checked, change) })
+    ListItem(headlineContent = { Text(label) }, trailingContent = { Switch(checked, change, modifier = Modifier.semantics { contentDescription = label }) })
 }

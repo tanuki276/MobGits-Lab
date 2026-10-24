@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -31,11 +32,11 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
     val state = vm.state
     val context = LocalContext.current
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        vm.flag("todos", granted); Notifications.schedule(context, granted)
+        vm.flag("enabled", granted); Notifications.schedule(context, granted)
     }
     val notifications: (Boolean) -> Unit = { value ->
         if (value && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        else { vm.flag("todos", value); Notifications.schedule(context, value) }
+        else { vm.flag("enabled", value); Notifications.schedule(context, value) }
     }
     if (state.directory.activeAccount == null) { AuthScreen(vm, open); return }
     val root = state.route.kind in setOf("home", "projects", "inbox", "search", "settings")
@@ -64,7 +65,7 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
             state.notice?.let { Text(it, Modifier.padding(8.dp)) }
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val contentModifier = if (maxWidth > 840.dp) Modifier.widthIn(max = 1000.dp).fillMaxHeight() else Modifier.fillMaxSize()
-                Box(contentModifier) {
+                Box(contentModifier.align(Alignment.TopCenter)) {
                     when (state.route.kind) {
                         "settings" -> SettingsScreen(vm, open, biometric, notifications)
                         "project" -> ProjectOverview(vm)

@@ -23,6 +23,9 @@ import org.json.JSONObject
 @Composable fun DiffScreen(vm: AppViewModel) {
     val state = vm.state
     val file = state.entries.firstOrNull()
+    var files by remember(state.route.project, state.route.id, vm.refs()) { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var filePicker by remember { mutableStateOf(false) }
+    LaunchedEffect(state.page, file?.text("new_path")) { file?.text("new_path")?.let { files = files + (state.page to it) } }
     var lines by remember { mutableStateOf<List<DiffLine>>(emptyList()) }
     var position by remember { mutableStateOf<ReviewPosition?>(null) }
     var threads by remember(state.route.project, state.route.id) { mutableStateOf<List<JSONObject>>(emptyList()) }
@@ -52,6 +55,11 @@ import org.json.JSONObject
         lines = withContext(Dispatchers.Default) { UnifiedDiff.parse(file?.text("diff").orEmpty()) }
         parsing = false
     }
+    if (filePicker) AlertDialog(onDismissRequest = { filePicker = false }, title = { Text("変更ファイル一覧") },
+        text = { LazyColumn(Modifier.heightIn(max = 320.dp)) {
+            item { Text("読み込み済みのファイルです。次のファイルを開くと一覧に追加されます。") }
+            items(files.toSortedMap().entries.toList()) { entry -> TextButton(onClick = { filePicker = false; vm.jumpDiff(entry.key) }) { Text(entry.key.toString() + ". " + entry.value) } }
+        } }, confirmButton = { TextButton(onClick = { filePicker = false }) { Text("閉じる") } })
     reply?.let { thread -> AlertDialog(onDismissRequest = { if (!state.submitting) reply = null }, title = { Text("スレッドへ返信") },
         text = { CommentEditor(vm, thread = thread) { reply = null } },
         confirmButton = { TextButton(enabled = !state.submitting, onClick = { reply = null }) { Text("閉じる") } }) }
@@ -60,6 +68,7 @@ import org.json.JSONObject
         text = { CommentEditor(vm, position = pos) { position = null } },
         confirmButton = { TextButton(enabled = !state.submitting, onClick = { position = null }) { Text("閉じる") } }) }
     Column {
+        TextButton(onClick = { filePicker = true }) { Text("変更ファイル一覧") }
         Text("ファイル ${state.page} · 旧 / 新 行番号", Modifier.padding(12.dp))
         Row {
             OutlinedButton(onClick = vm::previousDiff, enabled = state.page > 1 && !state.loading) { Text("前のファイル") }

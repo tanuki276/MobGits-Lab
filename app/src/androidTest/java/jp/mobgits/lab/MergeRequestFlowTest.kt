@@ -2,6 +2,7 @@ package jp.mobgits.lab
 
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.lifecycle.*
@@ -28,11 +29,12 @@ class MergeRequestFlowTest {
             vm = AppViewModel(app, SavedStateHandle(mapOf("route" to Destination("mr", 42, 7).encode())), CollaborationUseCase(fake)); store.put("mr", vm)
         }
         try {
-            compose.setContent { MaterialTheme { MobGitsShell(vm, {}, {}) } }
+            compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) { MobGitsShell(vm, {}, {}) } }
             compose.waitUntil(15000) { vm.state.detail != null && !vm.state.loading }
             compose.onNodeWithText("差分").performClick()
             compose.waitUntil(15000) { vm.state.entries.isNotEmpty() && !vm.state.loading }
             compose.waitUntil(15000) { compose.onAllNodesWithText("+new").fetchSemanticsNodes().isNotEmpty() }
+            compose.saveScreenshot("mr-diff-dark.png")
             compose.onNodeWithText("+new").performClick()
             compose.onNodeWithTag("comment-body").performTextInput("Please fix")
             compose.onNodeWithText("投稿").performClick()

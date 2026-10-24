@@ -16,8 +16,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 3
-        versionName = "0.3.0-dev"
+        versionCode = 4
+        versionName = "0.6.0-preview"
 
         buildConfigField("String", "GITLAB_CLIENT_ID", "\"$gitLabClientId\"")
         buildConfigField("String", "OAUTH_REDIRECT_URI", "\"mobgits://oauth/callback\"")

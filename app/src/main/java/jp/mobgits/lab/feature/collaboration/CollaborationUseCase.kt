@@ -51,6 +51,7 @@ class CollaborationUseCase(private val data: Resources) {
         val values = JSONArray(response.json).objects()
         return EntityPage(values, response.nextPage ?: if (values.size == (if (d.kind == "diffs") 1 else 20)) page + 1 else null, response.offline)
     }
+    suspend fun checkApi(account: String) { data.read(account, "/api/v4/user", cached = false) }
     suspend fun detail(account: String, d: Destination) = data.read(account, entityPath(d)).let { Detail(JSONObject(it.json), it.offline) }
     suspend fun file(account: String, d: Destination) = data.read(account, "${root(d)}/repository/files/${query(d.path)}/raw?ref=${query(d.ref)}")
     suspend fun save(account: String, d: Destination, fields: Map<String, String>, create: Boolean = false): JSONObject {
@@ -71,14 +72,14 @@ class CollaborationUseCase(private val data: Resources) {
         data.write(account, "${entityPath(d)}/discussions/${query(discussion)}", "PUT", mapOf("resolved" to resolved.toString()))
     }
     suspend fun approval(account: String, d: Destination) = data.read(account, "${entityPath(d)}/approvals").let { Detail(JSONObject(it.json), it.offline) }
-    suspend fun review(account: String, d: Destination, reviewed: DiffRefs, action: String) {
+    suspend fun review(account: String, d: Destination, reviewed: DiffRefs, action: String, approvalPassword: String? = null) {
         require(action in setOf("approve", "unapprove", "merge"))
         val latest = detail(account, d)
         check(!latest.offline && reviewed.complete && refs(latest.value) == reviewed) { "差分が更新されました。読み直してください" }
         check(latest.value.text("state") == "opened") { "このMRは開いていません" }
         if (action == "merge" && latest.value.optJSONObject("user")?.optBoolean("can_merge") != true) throw ApiFailure(FailureKind.FORBIDDEN)
         if (action == "merge") check(!latest.value.optBoolean("draft") && latest.value.text("detailed_merge_status") == "mergeable") { "マージ条件が揃っていません" }
-        data.write(account, "${entityPath(d)}/$action", if (action == "merge") "PUT" else "POST", mapOf("sha" to reviewed.head))
+        data.write(account, "${entityPath(d)}/$action", if (action == "merge") "PUT" else "POST", mapOf("sha" to reviewed.head) + if (action == "approve" && approvalPassword != null) mapOf("approval_password" to approvalPassword) else emptyMap())
     }
     suspend fun jobAction(account: String, d: Destination, action: String): JSONObject {
         require(action in setOf("retry", "cancel"))

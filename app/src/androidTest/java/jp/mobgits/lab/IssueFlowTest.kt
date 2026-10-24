@@ -54,6 +54,7 @@ class IssueFlowTest {
             compose.onNodeWithText("Close").performClick()
             compose.onAllNodesWithText("Close").onLast().performClick()
             compose.waitUntil(15000) { fake.closed && !vm.state.loading && !vm.state.submitting }
+            compose.saveScreenshot("issue-closed-light.png")
             assertTrue(fake.accounts.all { it == account.id })
         } finally {
             InstrumentationRegistry.getInstrumentation().runOnMainSync { store.clear() }

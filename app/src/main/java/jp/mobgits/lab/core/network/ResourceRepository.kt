@@ -25,14 +25,15 @@ class ResourceRepository(private val remote: NetworkSource, private val cache: R
             Resource(result.body, false, result.nextPage)
         } catch (e: ApiFailure) {
             if (cached && e.kind in setOf(FailureKind.NETWORK, FailureKind.SERVER, FailureKind.RATE_LIMIT)) {
-                cache.get(account, path)?.let { return@withContext Resource(it.json, true) }
+                cache.get(account, path)?.takeIf { System.currentTimeMillis() - it.savedAt <= 30L * 86400000 }?.let { return@withContext Resource(it.json, true) }
             }
             throw e
         }
     }
     override suspend fun write(account: String, path: String, method: String, fields: Map<String, String>): String = withContext(Dispatchers.IO) {
         val result = remote.request(account, path, method, fields).body
-        cache.clear(account) // Never return a stale detail after a successful write.
+        val entity = Regex("^(/api/v4/(?:projects/[^/]+/(?:issues|merge_requests|pipelines|jobs)|todos)/[0-9]+)(?:/|$)").find(path)?.groupValues?.get(1).orEmpty()
+        cache.invalidate(account, entity, if (entity.isNotBlank()) entity.substringBeforeLast('/') else path.substringBefore('?'))
         result
     }
     override suspend fun log(account: String, project: Long, job: Long, offset: Long) = withContext(Dispatchers.IO) { remote.logChunk(account, project, job, offset) }

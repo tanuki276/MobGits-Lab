@@ -41,7 +41,14 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
 
   device-tests:
+    name: device-tests (${{ matrix.label }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: phone, api: 30, profile: pixel_2}
+          - {label: tablet, api: 34, profile: pixel_c}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -59,14 +66,29 @@ jobs:
       - name: Compose and secure storage tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: ${{ matrix.api }}
           arch: x86_64
-          profile: pixel_2
+          profile: ${{ matrix.profile }}
           disable-animations: true
-          script: gradle :app:connectedDebugAndroidTest --stacktrace
+          script: |
+            gradle :app:connectedDebugAndroidTest --stacktrace
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -e class jp.mobgits.lab.ProcessDeathPrepareTest -e processDeath prepare jp.mobgits.lab.test/androidx.test.runner.AndroidJUnitRunner > process-prepare.txt
+            cat process-prepare.txt
+            python -c "from pathlib import Path; assert 'OK (1 test)' in Path('process-prepare.txt').read_text()"
+            adb shell am force-stop jp.mobgits.lab
+            adb shell am instrument -w -e class jp.mobgits.lab.ProcessDeathVerifyTest -e processDeath verify jp.mobgits.lab.test/androidx.test.runner.AndroidJUnitRunner > process-verify.txt
+            cat process-verify.txt
+            python -c "from pathlib import Path; assert 'OK (1 test)' in Path('process-verify.txt').read_text()"
+            adb pull /sdcard/Android/data/jp.mobgits.lab/files/qa qa-screenshots || true
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: device-test-results
-          path: app/build/reports/androidTests/
+          name: device-test-results-${{ matrix.label }}
+          path: |
+            app/build/reports/androidTests/
+            qa-screenshots/
+            process-prepare.txt
+            process-verify.txt
