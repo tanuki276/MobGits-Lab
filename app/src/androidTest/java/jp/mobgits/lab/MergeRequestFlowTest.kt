@@ -39,11 +39,11 @@ class MergeRequestFlowTest {
             compose.waitUntil(15000) { fake.commented && !vm.state.submitting && !vm.state.loading }
             compose.onNodeWithText("概要").performClick()
             compose.waitUntil(15000) { !vm.state.loading }
-            compose.onNode(hasScrollAction()).performScrollToNode(hasText("Approve"))
+            compose.onNodeWithTag("entity-detail-list").performScrollToNode(hasText("Approve"))
             compose.onNodeWithText("Approve").performClick()
             compose.onAllNodesWithText("Approve").onLast().performClick()
             compose.waitUntil(15000) { fake.approved && !vm.state.loading && !vm.state.submitting }
-            compose.onNode(hasScrollAction()).performScrollToNode(hasText("Merge"))
+            compose.onNodeWithTag("entity-detail-list").performScrollToNode(hasText("Merge"))
             compose.onNodeWithText("Merge").performClick()
             compose.onAllNodesWithText("Merge").onLast().performClick()
             compose.waitUntil(15000) { fake.merged && !vm.state.loading && !vm.state.submitting }

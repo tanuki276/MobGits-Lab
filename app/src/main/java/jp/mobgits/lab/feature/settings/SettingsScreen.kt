@@ -54,8 +54,9 @@ fun SettingsScreen(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean
                 TextButton(onClick = { open("https://github.com/tanuki276/MobGits-Lab/blob/feat/cr1-plan/docs/reference-repositories.yaml") }) { Text("Reference repositories") }
             }
             Text("MobGits Lab ${BuildConfig.VERSION_NAME}")
+            Text("アプリのライセンス: 未設定（リリース前に確定）")
             Text("GitLab Inc.とは関係のない非公式クライアントです。")
-            TextButton(onClick = { open("https://github.com/tanuki276/MobGits-Lab") }) { Text("GitHub / License") }
+            TextButton(onClick = { open("https://github.com/tanuki276/MobGits-Lab") }) { Text("GitHub") }
         }
     }
 }

@@ -41,7 +41,7 @@ interface NetworkSource {
     fun logChunk(id: String, project: Long, job: Long, offset: Long): LogChunk
 }
 
-class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager) : NetworkSource {
+class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager, private val limits: RateLimits = MemoryRateLimits()) : NetworkSource {
     private val directory = accounts
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .retryOnConnectionFailure(false).connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS)
@@ -56,13 +56,13 @@ class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager
         return scope.apiBase + path.removePrefix("/api/v4")
     }
     override fun request(id: String, path: String, method: String, fields: Map<String, String>): NetworkPage {
-        val scope = scope(id); val url = url(scope, path)
+        val scope = scope(id); checkRate(id); val url = url(scope, path)
         val body = FormBody.Builder().apply { fields.forEach { (k, v) -> if (k.endsWith("[]")) v.split(',').forEach { add(k, it.trim()) } else add(k, v) } }.build()
         return execute(when (method) {
             "GET" -> service.get(url, scope); "POST" -> service.post(url, scope, body)
             "PUT" -> service.put(url, scope, body); "DELETE" -> service.delete(url, scope)
             else -> error("Unsupported method")
-        }) { response ->
+        }, id) { response ->
             val input = response.body() ?: return@execute NetworkPage("", null)
             val bytes = input.byteStream().use { it.readNBytesCompat(8 * 1024 * 1024 + 1) }
             check(bytes.size <= 8 * 1024 * 1024) { "応答が大きすぎます。絞り込みを変更してください" }
@@ -71,8 +71,8 @@ class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager
     }
     override fun logChunk(id: String, project: Long, job: Long, offset: Long): LogChunk {
         require(offset >= 0)
-        val scope = scope(id)
-        return execute(service.get(url(scope, "/api/v4/projects/$project/jobs/$job/trace"), scope, "bytes=$offset-${offset + 32767}")) { response ->
+        val scope = scope(id); checkRate(id)
+        return try { execute(service.get(url(scope, "/api/v4/projects/$project/jobs/$job/trace"), scope, "bytes=$offset-${offset + 32767}"), id) { response ->
             val stream = response.body()!!.byteStream()
             stream.use {
                 if (response.code() == 200) {
@@ -86,13 +86,20 @@ class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager
                 LogChunk(bytes.toString(Charsets.UTF_8), offset + bytes.size, bytes.size < 32768)
             }
         }
+        } catch (error: ApiFailure) { if (error.status == 416) LogChunk("", offset, true) else throw error }
     }
-    private fun <T> execute(call: Call<ResponseBody>, block: (retrofit2.Response<ResponseBody>) -> T): T {
+    private fun checkRate(account: String) {
+        val remaining = limits.until(account) - System.currentTimeMillis()
+        if (remaining > 0) throw ApiFailure(FailureKind.RATE_LIMIT, 429, (remaining + 999) / 1000)
+    }
+    private fun <T> execute(call: Call<ResponseBody>, account: String, block: (retrofit2.Response<ResponseBody>) -> T): T {
         try {
             val response = call.execute()
             if (!response.isSuccessful) {
                 response.errorBody()?.close()
-                throw ApiFailure.from(response.code(), response.headers()["Retry-After"])
+                val error = ApiFailure.from(response.code(), response.headers()["Retry-After"])
+                if (error.kind == FailureKind.RATE_LIMIT) limits.defer(account, System.currentTimeMillis() + (error.retryAfterSeconds ?: 60).coerceAtMost((Long.MAX_VALUE - System.currentTimeMillis()) / 1000) * 1000)
+                throw error
             }
             return try { block(response) } finally { response.body()?.close() }
         } catch (e: ApiFailure) { throw e }

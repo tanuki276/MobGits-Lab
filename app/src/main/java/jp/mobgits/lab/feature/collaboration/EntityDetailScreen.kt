@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import jp.mobgits.lab.*
@@ -27,7 +28,7 @@ import org.json.JSONObject
             panels.forEach { (key, label) -> Tab(state.panel == key, { if (key == "logs") vm.panel("overview") else vm.panel(key); if (key == "logs") vm.loadLog() }, text = { Text(label) }) }
         }
         if (state.panel == "diffs") { DiffScreen(vm); return@Column }
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier = Modifier.testTag("entity-detail-list"), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.panel == "overview") {
                 item { Text(value.text("title").ifBlank { value.text("name") }.ifBlank { "${d.kind} #${d.id}" }, style = MaterialTheme.typography.headlineSmall) }
                 item {

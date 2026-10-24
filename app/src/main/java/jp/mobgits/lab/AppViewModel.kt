@@ -155,7 +155,12 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
     fun callback(uri: String) = authOperation { resetAccountScope(); graph.sessions.completeLogin(uri); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun switch(id: String) = authOperation { resetAccountScope(); graph.sessions.switchAccount(id); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun logout(id: String) = authOperation { resetAccountScope(); graph.sessions.signOut(id); graph.resources.clear(id); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
-    fun addServer(url: String, client: String, name: String) = authOperation { graph.preferences.saveServer(GitLabServer.create(url, client, name)); state = state.copy(directory = graph.preferences.snapshot()) }
+    fun addServer(url: String, client: String, name: String) = authOperation {
+        val value = GitLabServer.create(url, client, name)
+        val previous = graph.preferences.snapshot().servers.find { it.id == value.id }
+        graph.preferences.saveServer(if (client.isBlank() && previous != null) value.copy(oauthClientId = previous.oauthClientId) else value)
+        state = state.copy(directory = graph.preferences.snapshot())
+    }
     fun flag(key: String, value: Boolean) = authOperation { graph.preferences.setFlag(key, value) }
     fun theme(value: String) = authOperation { graph.preferences.theme(value) }
     fun clearCache() = authOperation { state.directory.activeAccount?.let { graph.resources.clear(it.id) }; state = state.copy(notice = "ローカルキャッシュを削除しました") }

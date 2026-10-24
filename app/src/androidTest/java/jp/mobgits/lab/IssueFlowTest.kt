@@ -41,16 +41,16 @@ class IssueFlowTest {
             compose.waitUntil(15000) { fake.created && !vm.state.loading && !vm.state.submitting }
             compose.onNodeWithText("Created issue").performClick()
             compose.waitUntil(15000) { vm.state.detail != null && !vm.state.loading }
-            compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("comment-body"))
+            compose.onNodeWithTag("entity-detail-list").performScrollToNode(hasTestTag("comment-body"))
             compose.onNodeWithTag("comment-body").performTextInput("Review comment")
             compose.onNodeWithText("投稿").performScrollTo().performClick()
             compose.waitUntil(15000) { fake.commented && !vm.state.loading && !vm.state.submitting }
-            compose.onNode(hasScrollAction()).performScrollToNode(hasText("編集"))
+            compose.onNodeWithTag("entity-detail-list").performScrollToNode(hasText("編集"))
             compose.onNodeWithText("編集").performClick()
             compose.onNodeWithTag("issue-title").performTextReplacement("Edited issue")
             compose.onNodeWithText("保存", useUnmergedTree = true).performClick()
             compose.waitUntil(15000) { fake.title == "Edited issue" && !vm.state.loading && !vm.state.submitting }
-            compose.onNode(hasScrollAction()).performScrollToNode(hasText("Close"))
+            compose.onNodeWithTag("entity-detail-list").performScrollToNode(hasText("Close"))
             compose.onNodeWithText("Close").performClick()
             compose.onAllNodesWithText("Close").onLast().performClick()
             compose.waitUntil(15000) { fake.closed && !vm.state.loading && !vm.state.submitting }

@@ -12,7 +12,7 @@ class AppGraph private constructor(private val context: Context) {
     val preferences = AppPreferences(context)
     val sessions = OAuthSessionManager(context, preferences)
     val database = MobDatabase.create(context)
-    val transport = GitLabTransport(preferences, sessions)
+    val transport = GitLabTransport(preferences, sessions, StoredRateLimits(context))
     val resources = ResourceRepository(transport, database.resources())
     suspend fun initialize() {
         // Legacy single-account PAT/OAuth data is intentionally not reused. Re-authenticate with PKCE.
