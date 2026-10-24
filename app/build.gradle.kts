@@ -1,10 +1,10 @@
-val gitLabClientId = providers.gradleProperty("MOBGITS_GITLAB_CLIENT_ID").orElse("").get()
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val gitLabClientId = providers.gradleProperty("MOBGITS_GITLAB_CLIENT_ID").orElse("").get()
 
 android {
     namespace = "jp.mobgits.lab"
