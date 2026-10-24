@@ -81,7 +81,7 @@ jobs:
             adb shell am instrument -w -e class jp.mobgits.lab.ProcessDeathVerifyTest -e processDeath verify jp.mobgits.lab.test/androidx.test.runner.AndroidJUnitRunner > process-verify.txt
             cat process-verify.txt
             python -c "from pathlib import Path; assert 'OK (1 test)' in Path('process-verify.txt').read_text()"
-            adb pull /sdcard/Android/data/jp.mobgits.lab/files/qa qa-screenshots || true
+            adb pull /sdcard/Pictures/MobGitsQA qa-screenshots
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

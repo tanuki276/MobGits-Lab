@@ -76,3 +76,7 @@ Phone API 30 / tablet API 34:
 - [ ] FCMを使用する場合、配信基盤の端末登録・認可・解除
 
 機能実装と実環境でのリリース判定は区別する。CR3の編集・Commit・branch/MR作成は含めない。
+
+## CI実行記録
+
+機能実装のUnit / lint / APK、phone / tablet、force-stop復帰は [CI 40105972389](https://github.com/tanuki276/MobGits-Lab/actions/runs/40105972389) で成功。以後の変更は各PRの最新CIを参照する。

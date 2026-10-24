@@ -134,7 +134,7 @@ Self-ManagedのOAuth applicationはserverごとの登録が必要。client IDの
 | CR1-14 | Settings画面 | UI | 10,11,12 | 実装・統合済（#6〜#8） |
 | CR1-15 | PAT UI/処理削除 | Auth | 02 | 実装・統合済（#6〜#8） |
 | CR1-16 | Reference repo設定 | Docs | — | 統合済（#4） |
-| CR1-17 | Unit / UI tests | QA | 全体 | Unit/UI成功、force-stop・tablet追加検証中 |
+| CR1-17 | Unit / UI tests | QA | 全体 | phone/tablet・force-stop検証済（CI 40105972389） |
 
 ### CR1 Definition of Done
 
@@ -177,24 +177,24 @@ target type / idを解析して対象へ遷移する。Android notificationも�
 
 | ID | タスク | 状態 |
 |---|---|---|
-| CR2-01 | Issue repository | 実装済。CR2仕上げ検証中 |
-| CR2-02 | Issue list | 実装済。CR2仕上げ検証中 |
-| CR2-03 | Issue detail | 実装済。CR2仕上げ検証中 |
-| CR2-04 | Issue create/edit | 実装済。CR2仕上げ検証中 |
-| CR2-05 | Issue comments | 実装済。CR2仕上げ検証中 |
-| CR2-06 | MR repository | 実装済。CR2仕上げ検証中 |
-| CR2-07 | MR overview | 実装済。CR2仕上げ検証中 |
-| CR2-08 | Diff parser/model | 実装済。CR2仕上げ検証中 |
-| CR2-09 | Diff viewer | 実装済。CR2仕上げ検証中 |
-| CR2-10 | Inline discussions | 実装済。CR2仕上げ検証中 |
-| CR2-11 | Approve/unapprove | 実装済。CR2仕上げ検証中 |
-| CR2-12 | Merge flow | 実装済。CR2仕上げ検証中 |
-| CR2-13 | Pipeline detail | 実装済。CR2仕上げ検証中 |
-| CR2-14 | Job detail | 実装済。CR2仕上げ検証中 |
-| CR2-15 | Job logs | 実装済。CR2仕上げ検証中 |
-| CR2-16 | Retry/cancel | 実装済。CR2仕上げ検証中 |
-| CR2-17 | Inbox分類 | 実装済。CR2仕上げ検証中 |
-| CR2-18 | Deep Link | 実装済。CR2仕上げ検証中 |
+| CR2-01 | Issue repository | 実装済。phone/tablet CI成功（#9） |
+| CR2-02 | Issue list | 実装済。phone/tablet CI成功（#9） |
+| CR2-03 | Issue detail | 実装済。phone/tablet CI成功（#9） |
+| CR2-04 | Issue create/edit | 実装済。phone/tablet CI成功（#9） |
+| CR2-05 | Issue comments | 実装済。phone/tablet CI成功（#9） |
+| CR2-06 | MR repository | 実装済。phone/tablet CI成功（#9） |
+| CR2-07 | MR overview | 実装済。phone/tablet CI成功（#9） |
+| CR2-08 | Diff parser/model | 実装済。phone/tablet CI成功（#9） |
+| CR2-09 | Diff viewer | 実装済。phone/tablet CI成功（#9） |
+| CR2-10 | Inline discussions | 実装済。phone/tablet CI成功（#9） |
+| CR2-11 | Approve/unapprove | 実装済。phone/tablet CI成功（#9） |
+| CR2-12 | Merge flow | 実装済。phone/tablet CI成功（#9） |
+| CR2-13 | Pipeline detail | 実装済。phone/tablet CI成功（#9） |
+| CR2-14 | Job detail | 実装済。phone/tablet CI成功（#9） |
+| CR2-15 | Job logs | 実装済。phone/tablet CI成功（#9） |
+| CR2-16 | Retry/cancel | 実装済。phone/tablet CI成功（#9） |
+| CR2-17 | Inbox分類 | 実装済。phone/tablet CI成功（#9） |
+| CR2-18 | Deep Link | 実装済。phone/tablet CI成功（#9） |
 | CR2-19 | Android notification | 定期同期実装。FCM配信基盤は外部設定が必要 |
 | CR2-20 | Tests/performance | Unit/UIあり。実機profileはリリース判定項目 |
 
