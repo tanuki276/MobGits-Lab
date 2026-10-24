@@ -46,7 +46,7 @@ class OAuthRecoveryTest {
             val account = GitLabAccount.create(gitlab.id, 123, "refresh-test", "Test")
             accounts.saveServer(gitlab); accounts.saveAccount(account)
             val secure = EncryptedSessionStore(context)
-            secure.write(OAuthSession(account.id, "old-access", "old-refresh", Instant.now().minusSeconds(60)))
+            secure.write(OAuthSession(account.id, "old-access", "old-refresh", Instant.now().minusSeconds(60), server.oauthClientId))
             val client = OkHttpClient.Builder().sslSocketFactory(clientTls.sslSocketFactory(), clientTls.trustManager).followRedirects(false).build()
             val sessions = OAuthSessionManager(context, accounts, client)
             try {

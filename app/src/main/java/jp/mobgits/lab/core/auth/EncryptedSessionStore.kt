@@ -37,10 +37,10 @@ internal class EncryptedSessionStore(context: Context) : SecureTokenStore {
     }
     override suspend fun read(accountId: String): OAuthSession? = get("session:$accountId")?.let {
         val j = JSONObject(it)
-        OAuthSession(accountId, j.getString("access"), j.optString("refresh").takeUnless { v -> v.isBlank() || v == "null" }, Instant.ofEpochSecond(j.getLong("expiry")))
+        OAuthSession(accountId, j.getString("access"), j.optString("refresh").takeUnless { v -> v.isBlank() || v == "null" }, Instant.ofEpochSecond(j.getLong("expiry")), j.optString("client").takeIf { v -> v.isNotBlank() && v != "null" })
     }
     override suspend fun write(session: OAuthSession) = put("session:${session.accountId}", JSONObject().apply {
-        put("access", session.accessToken); put("refresh", session.refreshToken); put("expiry", session.expiresAt.epochSecond)
+        put("client", session.oauthClientId); put("access", session.accessToken); put("refresh", session.refreshToken); put("expiry", session.expiresAt.epochSecond)
     }.toString())
     override suspend fun remove(accountId: String) = put("session:$accountId", null)
 }

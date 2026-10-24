@@ -19,7 +19,7 @@ interface AccountRepository {
 sealed interface SessionStatus {
     data object SignedOut : SessionStatus
     data class Authenticated(val account: GitLabAccount) : SessionStatus
-    data class ReauthenticationRequired(val accountId: String) : SessionStatus
+    data class ReauthenticationRequired(val accountId: String, val oauthConfigurationChanged: Boolean = false) : SessionStatus
     data class TemporarilyUnavailable(val accountId: String) : SessionStatus
 }
 

@@ -59,7 +59,7 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
             if (state.loading || state.submitting) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.offline) Text("オフライン：保存した内容を表示しています。書き込みはできません。", Modifier.padding(8.dp))
             if (state.session is SessionStatus.ReauthenticationRequired) {
-                TextButton(onClick = { vm.navigate(Destination("settings"), true) }) { Text("セッションが切れました。設定から再認証してください") }
+                TextButton(onClick = { vm.navigate(Destination("settings"), true) }) { Text(if ((state.session as? SessionStatus.ReauthenticationRequired)?.oauthConfigurationChanged == true) "OAuth設定が更新されました。設定からもう一度ログインしてください" else "セッションが切れました。設定から再認証してください") }
             }
             state.error?.let { Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) }
             state.notice?.let { Text(it, Modifier.padding(8.dp)) }

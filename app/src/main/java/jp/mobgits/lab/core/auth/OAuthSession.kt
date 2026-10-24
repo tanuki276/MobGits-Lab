@@ -8,12 +8,15 @@ internal class OAuthSession(
     val accountId: String,
     val accessToken: String,
     val refreshToken: String?,
-    val expiresAt: Instant
+    val expiresAt: Instant,
+    val oauthClientId: String? = null
 ) {
     init {
         require(accountId.isNotBlank() && accessToken.isNotBlank())
         require(refreshToken == null || refreshToken.isNotBlank())
     }
+
+    fun belongsTo(clientId: String): Boolean = !oauthClientId.isNullOrBlank() && oauthClientId == clientId
 
     fun needsRefresh(now: Instant, leeway: Duration = Duration.ofSeconds(60)): Boolean {
         require(!leeway.isNegative)

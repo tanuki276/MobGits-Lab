@@ -55,7 +55,7 @@ class OAuthSessionManager internal constructor(context: Context, private val acc
             JSONObject(it.body!!.string())
         }
         val account = GitLabAccount.create(server.id, user.getLong("id"), user.getString("username"), user.optString("name"), user.optString("avatar_url").takeUnless { it == "null" }, true)
-        secure.write(session(account.id, tokens)); accounts.saveAccount(account)
+        secure.write(session(account.id, tokens, server.oauthClientId)); accounts.saveAccount(account)
         secure.put("pending", null); state.value = SessionStatus.Authenticated(account)
         account
     } }
@@ -67,9 +67,9 @@ class OAuthSessionManager internal constructor(context: Context, private val acc
             JSONObject(it.body!!.string())
         }
     }
-    private fun session(accountId: String, json: JSONObject, fallbackRefresh: String? = null) = OAuthSession(accountId,
+    private fun session(accountId: String, json: JSONObject, clientId: String, fallbackRefresh: String? = null) = OAuthSession(accountId,
         json.getString("access_token"), json.optString("refresh_token").takeUnless { it.isBlank() || it == "null" } ?: fallbackRefresh,
-        Instant.ofEpochSecond(json.optLong("created_at", Instant.now().epochSecond) + json.getLong("expires_in")))
+        Instant.ofEpochSecond(json.optLong("created_at", Instant.now().epochSecond) + json.getLong("expires_in")), clientId)
 
     internal suspend fun credential(accountId: String, rejectedToken: String? = null): String = withContext(Dispatchers.IO) { mutex.withLock {
         val directory = accounts.snapshot()
@@ -77,10 +77,15 @@ class OAuthSessionManager internal constructor(context: Context, private val acc
         val server = directory.servers.single { it.id == account.serverId }
         val old = try { secure.read(accountId) } catch (_: Exception) { null }
         if (old == null) { if (account.isActive) state.value = SessionStatus.ReauthenticationRequired(accountId); throw ApiFailure(FailureKind.AUTHENTICATION) }
+        if (!old.belongsTo(server.oauthClientId)) {
+            secure.remove(accountId)
+            if (account.isActive) state.value = SessionStatus.ReauthenticationRequired(accountId, true)
+            throw ApiFailure(FailureKind.AUTHENTICATION)
+        }
         if (!old.needsRefresh(Instant.now()) && (rejectedToken == null || rejectedToken != old.accessToken)) return@withLock old.accessToken
         val refresh = old.refreshToken ?: run { if (account.isActive) state.value = SessionStatus.ReauthenticationRequired(accountId); throw ApiFailure(FailureKind.AUTHENTICATION) }
         try {
-            val next = session(accountId, token(server, mapOf("grant_type" to "refresh_token", "refresh_token" to refresh, "redirect_uri" to redirect)), refresh)
+            val next = session(accountId, token(server, mapOf("grant_type" to "refresh_token", "refresh_token" to refresh, "redirect_uri" to redirect)), server.oauthClientId, refresh)
             secure.write(next); if (account.isActive) state.value = SessionStatus.Authenticated(account); next.accessToken
         } catch (e: Exception) {
             if (e is CancellationException) throw e
