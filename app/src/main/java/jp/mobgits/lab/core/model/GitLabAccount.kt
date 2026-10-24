@@ -42,10 +42,17 @@ class AccountDirectory(servers: List<GitLabServer> = emptyList(), accounts: List
         require(this.accounts.all { account -> this.servers.any { it.id == account.serverId } }) { "Unknown server" }
     }
 
-    fun withServer(server: GitLabServer): AccountDirectory =
-        AccountDirectory(servers.filterNot { it.id == server.id } + server, accounts)
+    fun withServer(server: GitLabServer): AccountDirectory {
+        require(servers.none { it.id == server.id && it.baseUrl != server.baseUrl }) {
+            "A server identity cannot be rebound to a different URL"
+        }
+        return AccountDirectory(servers.filterNot { it.id == server.id } + server, accounts)
+    }
 
     fun withAccount(account: GitLabAccount): AccountDirectory {
+        require(accounts.none { it.id == account.id && (it.serverId != account.serverId || it.userId != account.userId) }) {
+            "An account identity cannot be rebound to another server or user"
+        }
         val retained = accounts.filterNot { it.id == account.id }
         return AccountDirectory(servers, retained.map { if (account.isActive) it.copy(isActive = false) else it } + account)
     }

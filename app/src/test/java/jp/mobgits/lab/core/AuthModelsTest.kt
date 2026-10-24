@@ -70,6 +70,17 @@ class AuthModelsTest {
         catch (_: IllegalArgumentException) { }
     }
 
+    @Test fun existingIdentityCannotBeReboundToAnotherServerOrUser() {
+        val account = GitLabAccount.create(personal.id, 1, "one", "One")
+        val directory = AccountDirectory(listOf(personal, work), listOf(account))
+        try { directory.withServer(work.copy(id = personal.id)); fail("Rebound server identity") }
+        catch (_: IllegalArgumentException) { }
+        try { directory.withAccount(account.copy(serverId = work.id)); fail("Rebound account server") }
+        catch (_: IllegalArgumentException) { }
+        try { directory.withAccount(account.copy(userId = 2)); fail("Rebound account user") }
+        catch (_: IllegalArgumentException) { }
+    }
+
     @Test fun refreshUsesExpiryLeewayAndCredentialsAreRedacted() {
         val expiry = Instant.parse("2026-10-24T12:00:00Z")
         val session = OAuthSession("account", "ACCESS_SECRET", "REFRESH_SECRET", expiry)
