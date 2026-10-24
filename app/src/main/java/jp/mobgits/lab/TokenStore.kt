@@ -13,38 +13,83 @@ import javax.crypto.spec.GCMParameterSpec
 class TokenStore(context: Context) {
     private val prefs = context.getSharedPreferences("mobgits_auth", Context.MODE_PRIVATE)
 
-    fun save(baseUrl: String, token: String) {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-        val encrypted = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+    fun savePat(baseUrl: String, token: String) {
+        save(
+            StoredAuth(
+                baseUrl = baseUrl.trim().trimEnd('/'),
+                accessToken = token,
+                refreshToken = null,
+                expiresAtEpochSeconds = null,
+                type = AuthType.PAT
+            )
+        )
+    }
 
+    fun saveOAuth(baseUrl: String, tokens: OAuthTokens) {
+        save(
+            StoredAuth(
+                baseUrl = baseUrl.trim().trimEnd('/'),
+                accessToken = tokens.accessToken,
+                refreshToken = tokens.refreshToken,
+                expiresAtEpochSeconds = tokens.expiresAtEpochSeconds,
+                type = AuthType.OAUTH
+            )
+        )
+    }
+
+    private fun save(auth: StoredAuth) {
         prefs.edit()
-            .putString(KEY_BASE_URL, baseUrl.trim().trimEnd('/'))
-            .putString(KEY_TOKEN, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString(KEY_BASE_URL, auth.baseUrl)
+            .putString(KEY_ACCESS_TOKEN, encrypt(auth.accessToken))
+            .putString(KEY_REFRESH_TOKEN, auth.refreshToken?.let(::encrypt))
+            .putLong(KEY_EXPIRES_AT, auth.expiresAtEpochSeconds ?: -1L)
+            .putString(KEY_AUTH_TYPE, auth.type.name)
             .apply()
     }
 
     fun load(): StoredAuth? {
         val baseUrl = prefs.getString(KEY_BASE_URL, null) ?: return null
-        val encrypted = prefs.getString(KEY_TOKEN, null) ?: return null
-        val iv = prefs.getString(KEY_IV, null) ?: return null
+        val access = prefs.getString(KEY_ACCESS_TOKEN, null) ?: return null
+        val type = runCatching {
+            AuthType.valueOf(prefs.getString(KEY_AUTH_TYPE, AuthType.PAT.name)!!)
+        }.getOrDefault(AuthType.PAT)
+        val expires = prefs.getLong(KEY_EXPIRES_AT, -1L).takeIf { it > 0 }
+        val refresh = prefs.getString(KEY_REFRESH_TOKEN, null)?.let { runCatching { decrypt(it) }.getOrNull() }
 
         return runCatching {
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                getOrCreateKey(),
-                GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP))
+            StoredAuth(
+                baseUrl = baseUrl,
+                accessToken = decrypt(access),
+                refreshToken = refresh,
+                expiresAtEpochSeconds = expires,
+                type = type
             )
-            val token = cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP))
-                .toString(Charsets.UTF_8)
-            StoredAuth(baseUrl, token)
         }.getOrNull()
     }
 
     fun clear() {
         prefs.edit().clear().apply()
+    }
+
+    private fun encrypt(value: String): String {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+        val iv = Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
+        val body = Base64.encodeToString(encrypted, Base64.NO_WRAP)
+        return "$iv:$body"
+    }
+
+    private fun decrypt(value: String): String {
+        val parts = value.split(':', limit = 2)
+        require(parts.size == 2) { "保存された認証情報が壊れています" }
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            getOrCreateKey(),
+            GCMParameterSpec(128, Base64.decode(parts[0], Base64.NO_WRAP))
+        )
+        return cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)).toString(Charsets.UTF_8)
     }
 
     private fun getOrCreateKey(): SecretKey {
@@ -65,12 +110,25 @@ class TokenStore(context: Context) {
     }
 
     companion object {
-        private const val KEY_ALIAS = "mobgits_gitlab_token"
+        private const val KEY_ALIAS = "mobgits_gitlab_auth_v2"
         private const val KEY_BASE_URL = "base_url"
-        private const val KEY_TOKEN = "token"
-        private const val KEY_IV = "iv"
+        private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_EXPIRES_AT = "expires_at"
+        private const val KEY_AUTH_TYPE = "auth_type"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
     }
 }
 
-data class StoredAuth(val baseUrl: String, val token: String)
+enum class AuthType { OAUTH, PAT }
+
+data class StoredAuth(
+    val baseUrl: String,
+    val accessToken: String,
+    val refreshToken: String?,
+    val expiresAtEpochSeconds: Long?,
+    val type: AuthType
+) {
+    fun needsRefresh(nowEpochSeconds: Long = System.currentTimeMillis() / 1000): Boolean =
+        type == AuthType.OAUTH && expiresAtEpochSeconds?.let { nowEpochSeconds >= it - 60 } == true
+}

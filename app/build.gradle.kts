@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val gitLabClientId = providers.gradleProperty("MOBGITS_GITLAB_CLIENT_ID").orElse("").get()
+
 android {
     namespace = "jp.mobgits.lab"
     compileSdk = 35
@@ -12,8 +14,11 @@ android {
         applicationId = "jp.mobgits.lab"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+
+        buildConfigField("String", "GITLAB_CLIENT_ID", "\"$gitLabClientId\"")
+        buildConfigField("String", "OAUTH_REDIRECT_URI", "\"mobgits://oauth/callback\"")
     }
 
     buildTypes {
@@ -56,5 +61,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
 
+    testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
