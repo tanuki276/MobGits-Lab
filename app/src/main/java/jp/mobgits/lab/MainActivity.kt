@@ -260,6 +260,11 @@ private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobG
     var tab by remember { mutableIntStateOf(0) }
     val tabs = listOf("コード", "Issue", "MR", "CI/CD")
 
+    if (state.review != null) {
+        MergeReviewScreen(state.review, snackbar, vm)
+        return
+    }
+
     if (state.selectedPipeline != null) {
         CiDetailScreen(state, snackbar, vm)
         return
@@ -305,7 +310,7 @@ private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobG
                 when (tab) {
                     0 -> RepositoryScreen(state, vm::openDirectory, vm::openFile)
                     1 -> IssueList(state.issues)
-                    2 -> MergeRequestList(state.mergeRequests)
+                    2 -> MergeRequestList(state.mergeRequests, vm::openMergeRequest)
                     else -> PipelineList(state.pipelines, vm::openPipeline)
                 }
                 if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -350,10 +355,10 @@ private fun IssueList(issues: List<GitLabIssue>) {
 }
 
 @Composable
-private fun MergeRequestList(items: List<GitLabMergeRequest>) {
+private fun MergeRequestList(items: List<GitLabMergeRequest>, open: (GitLabMergeRequest) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(items, key = { it.iid }) { mr ->
-            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp)) {
+            Card(Modifier.fillMaxWidth().clickable { open(mr) }) { Column(Modifier.padding(14.dp)) {
                 Text("!${mr.iid} ${if (mr.draft) "[Draft] " else ""}${mr.title}", fontWeight = FontWeight.SemiBold)
                 Text("${mr.sourceBranch} → ${mr.targetBranch}", style = MaterialTheme.typography.bodySmall)
                 Text("@${mr.author}", style = MaterialTheme.typography.bodySmall)

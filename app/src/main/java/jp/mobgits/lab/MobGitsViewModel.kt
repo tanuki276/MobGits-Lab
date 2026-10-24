@@ -7,12 +7,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class MobGitsViewModel(application: Application) : AndroidViewModel(application) {
     private val api = GitLabApi()
+    private val reviewApi = MergeReviewApi(api)
+    private var reviewRequest = 0
+    private var reviewLoad: Job? = null
     private val tokenStore = TokenStore(application)
     private val oauth = OAuthManager()
     private var pendingOAuth: OAuthManager.PendingAuth? = null
@@ -209,6 +214,109 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun openMergeRequest(mr: GitLabMergeRequest) {
+        if (state.review?.submitting == true) return
+        reviewRequest++
+        reviewLoad?.cancel()
+        state = state.copy(review = ReviewState(mr.iid, mr.title))
+        refreshReview()
+    }
+
+    fun refreshReview() {
+        val review = state.review ?: return
+        if (review.submitting) return
+        val auth = state.auth ?: return
+        val project = state.selectedProject ?: return
+        val request = ++reviewRequest
+        reviewLoad?.cancel()
+        state = state.copy(review = review.copy(loading = true, stale = true, error = null))
+        reviewLoad = viewModelScope.launch {
+            try {
+                val snapshot = reviewApi.load(freshAuth(auth), project.id, review.iid)
+                if (request == reviewRequest) {
+                    val current = state.review ?: return@launch
+                    // Keep a written draft bound to its original SHA; never silently rebase a comment.
+                    val position = current.commentPosition
+                    state = state.copy(review = current.copy(snapshot = snapshot, loading = false, stale = false,
+                        error = if (position != null && position.refs != snapshot.detail.refs) "下書きの差分が古くなりました。本文をコピーして行を選び直してください" else null))
+                    if (snapshot.detail.state != "opened") state = state.copy(mergeRequests = state.mergeRequests.filterNot { it.iid == review.iid })
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (request == reviewRequest) state = state.copy(review = state.review?.copy(loading = false, stale = true, error = error.message))
+            }
+        }
+    }
+
+    fun selectReviewLine(diff: ReviewDiff, line: DiffLine) {
+        val review = state.review ?: return
+        val snapshot = review.snapshot ?: return
+        if (review.loading || review.submitting || review.stale || !snapshot.detail.canSubmit || !line.commentable || diff.unavailable) return
+        state = state.copy(review = review.copy(commentPosition = ReviewPosition(snapshot.detail.refs, diff.oldPath, diff.newPath, line.oldLine, line.newLine)))
+    }
+
+    fun updateReviewDraft(body: String) {
+        val review = state.review ?: return
+        if (!review.submitting) state = state.copy(review = review.copy(draft = body))
+    }
+
+    fun dismissReviewComment() {
+        val review = state.review ?: return
+        if (!review.submitting) state = state.copy(review = review.copy(commentPosition = null))
+    }
+
+    fun postReviewComment() {
+        val review = state.review ?: return
+        val position = review.commentPosition ?: return
+        if (review.draft.isBlank() || review.stale || position.refs != review.snapshot?.detail?.refs) return
+        submitReview("コメントを投稿しました") { auth, project ->
+            reviewApi.comment(auth, project, review.iid, position, review.draft)
+        }
+    }
+
+    fun reviewAction(action: ReviewAction) {
+        val review = state.review ?: return
+        val snapshot = review.snapshot ?: return
+        if (!snapshot.detail.canSubmit) return
+        if (action == ReviewAction.MERGE && !snapshot.detail.mergeable) return
+        if (action == ReviewAction.APPROVE && (snapshot.approval?.canApprove != true || snapshot.approval?.hasApproved == true)) return
+        submitReview("${action.label} が完了しました") { auth, project ->
+            reviewApi.act(auth, project, snapshot.detail, action)
+        }
+    }
+
+    private fun submitReview(success: String, block: suspend (StoredAuth, Long) -> Unit) {
+        val review = state.review ?: return
+        if (review.loading || review.submitting || review.stale) return
+        val auth = state.auth ?: return
+        val project = state.selectedProject ?: return
+        val request = ++reviewRequest
+        state = state.copy(review = review.copy(submitting = true, error = null, notice = null))
+        viewModelScope.launch {
+            try {
+                block(freshAuth(auth), project.id)
+                if (request == reviewRequest) {
+                    state = state.copy(review = state.review?.copy(submitting = false, notice = success,
+                        draft = if (review.commentPosition != null) "" else review.draft, commentPosition = null))
+                    refreshReview()
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (request == reviewRequest) state = state.copy(review = state.review?.copy(submitting = false, stale = true,
+                    error = "${error.message}。通信が切れた場合は反映済みの可能性があります。再読み込みして確認してください"))
+            }
+        }
+    }
+
+    fun closeReview() {
+        if (state.review?.submitting == true) return
+        reviewRequest++
+        reviewLoad?.cancel()
+        state = state.copy(review = null)
+    }
+
     private var ciRequest = 0
 
     fun openPipeline(pipeline: GitLabPipeline) {
@@ -263,6 +371,7 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun closeProject() {
+        closeReview()
         ciRequest++
         state = state.copy(selectedProject = null, openedFile = null, fileContent = null, selectedPipeline = null, selectedJob = null, jobs = emptyList(), jobLog = null, ciLoading = false)
     }
@@ -272,6 +381,8 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun logout() {
+        reviewRequest++
+        reviewLoad?.cancel()
         ciRequest++
         tokenStore.clear()
         pendingOAuth = null
@@ -289,6 +400,7 @@ private data class ProjectData(val issues: List<GitLabIssue>, val mergeRequests:
 enum class RootScreen { HOME, INBOX, PROJECTS, SEARCH, PROFILE }
 
 data class AppState(
+    val review: ReviewState? = null,
     val selectedPipeline: GitLabPipeline? = null,
     val selectedJob: GitLabJob? = null,
     val jobs: List<GitLabJob> = emptyList(),

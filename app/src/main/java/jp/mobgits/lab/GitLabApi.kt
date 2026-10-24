@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-class GitLabApi {
+open class GitLabApi {
     suspend fun currentUser(auth: StoredAuth): GitLabUser = withContext(Dispatchers.IO) {
         val json = JSONObject(get(auth, "/api/v4/user"))
         GitLabUser(
@@ -144,9 +144,12 @@ class GitLabApi {
         defaultBranch = json.optString("default_branch", "main")
     )
 
-    private fun get(auth: StoredAuth, path: String): String = request(auth, path, "GET")
+    internal fun get(auth: StoredAuth, path: String): String = request(auth, path, "GET")
 
-    private fun request(auth: StoredAuth, path: String, method: String): String {
+    internal open fun request(auth: StoredAuth, path: String, method: String, fields: Map<String, String> = emptyMap()): String {
+        val payload = fields.entries.joinToString("&") { (key, value) ->
+            "${URLEncoder.encode(key, "UTF-8")}=${URLEncoder.encode(value, "UTF-8")}"
+        }.toByteArray(Charsets.UTF_8)
         val normalized = normalizeBaseUrl(auth.baseUrl)
         val connection = (URL(normalized + path).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = false
@@ -159,11 +162,15 @@ class GitLabApi {
                 AuthType.OAUTH -> setRequestProperty("Authorization", "Bearer ${auth.accessToken}")
                 AuthType.PAT -> setRequestProperty("PRIVATE-TOKEN", auth.accessToken)
             }
-            if (method == "POST") doOutput = true
+            if (method == "POST" || method == "PUT") {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                setFixedLengthStreamingMode(payload.size)
+            }
         }
 
         return try {
-            if (method == "POST") connection.outputStream.use { }
+            if (method == "POST" || method == "PUT") connection.outputStream.use { it.write(payload) }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
