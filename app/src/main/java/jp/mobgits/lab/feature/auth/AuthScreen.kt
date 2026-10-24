@@ -12,6 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import jp.mobgits.lab.*
+import jp.mobgits.lab.R
 
 @Composable
 fun AuthScreen(vm: AppViewModel, open: (String) -> Unit) {
