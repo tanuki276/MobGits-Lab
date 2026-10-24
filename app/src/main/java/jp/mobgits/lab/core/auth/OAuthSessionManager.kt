@@ -63,7 +63,19 @@ class OAuthSessionManager internal constructor(context: Context, private val acc
     private fun token(server: GitLabServer, fields: Map<String, String>): JSONObject {
         val body = FormBody.Builder().add("client_id", server.oauthClientId).apply { fields.forEach { (k, v) -> add(k, v) } }.build()
         return client.newCall(Request.Builder().url("${server.baseUrl}/oauth/token").post(body).build()).execute().use {
-            if (!it.isSuccessful) throw ApiFailure.from(if (it.code == 400) 401 else it.code)
+            if (!it.isSuccessful) {
+                val oauthError = runCatching { JSONObject(it.body?.string().orEmpty()).optString("error") }.getOrDefault("")
+                when (oauthError) {
+                    "invalid_client" -> error("GitLabのOAuthアプリ設定を確認してください。Application IDとConfidential（オフ）が必要です。")
+                    "invalid_grant" -> {
+                        if (fields["grant_type"] == "refresh_token") throw ApiFailure(FailureKind.AUTHENTICATION, it.code)
+                        error("認証コードが期限切れ、使用済み、または認証設定が一致しません。アプリからログインをやり直してください。")
+                    }
+                    "invalid_scope" -> error("GitLabのOAuthアプリでapiスコープを許可してください。")
+                    "invalid_request" -> error("GitLabが認証要求を受け付けませんでした。OAuthアプリの登録設定を確認してください。")
+                    else -> throw ApiFailure.from(it.code)
+                }
+            }
             JSONObject(it.body!!.string())
         }
     }

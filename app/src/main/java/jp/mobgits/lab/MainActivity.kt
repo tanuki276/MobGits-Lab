@@ -56,7 +56,7 @@ class MainActivity : FragmentActivity() {
     private fun browse(value: String) { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(value))) }
     private fun handle(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme == "mobgits" && data.host == "oauth" && data.path == "/callback") vm.callback(data.toString())
+        if (data.scheme == "mobgits" && data.host == "oauth" && data.path == "/callback") { intent.data = null; vm.callback(data.toString()) }
         else DeepLinks.parse(data.toString())?.let { vm.deepLink(it.first, it.second) }
     }
     private fun unlock() {

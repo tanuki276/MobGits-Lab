@@ -33,6 +33,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
     private var epoch = 0
     private var loadJob: Job? = null
     private val history = saved.get<ArrayList<String>>("history") ?: arrayListOf()
+    private val initialized = CompletableDeferred<Unit>()
     init {
         viewModelScope.launch { graph.preferences.directory.collect { state = state.copy(directory = it) } }
         viewModelScope.launch { graph.preferences.settings.collect { state = state.copy(settings = it) } }
@@ -40,6 +41,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         viewModelScope.launch {
             try { graph.initialize(); jp.mobgits.lab.feature.inbox.Notifications.schedule(getApplication<Application>(), graph.preferences.settings.first().enabled); state = state.copy(directory = graph.preferences.snapshot()); reload() }
             catch (e: Exception) { if (e is CancellationException) throw e; state = state.copy(loading = false, error = e.message) }
+            finally { initialized.complete(Unit) }
         }
     }
     private fun account() = state.directory.activeAccount?.id ?: error("アカウントを選択してください")
@@ -155,7 +157,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         state = UiState(directory = state.directory, settings = state.settings, session = state.session, loading = true)
     }
     fun login(serverId: String, open: (String) -> Unit) = authOperation { open(graph.sessions.beginLogin(serverId)) }
-    fun callback(uri: String) = authOperation { resetAccountScope(); graph.sessions.completeLogin(uri); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
+    fun callback(uri: String) = authOperation { initialized.await(); resetAccountScope(); graph.sessions.completeLogin(uri); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun switch(id: String) = authOperation { resetAccountScope(); graph.sessions.switchAccount(id); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun logout(id: String) = authOperation { resetAccountScope(); graph.sessions.signOut(id); graph.resources.clear(id); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun addServer(url: String, name: String) = authOperation {
