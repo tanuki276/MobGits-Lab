@@ -8,13 +8,15 @@ import jp.mobgits.lab.core.database.MobDatabase
 import jp.mobgits.lab.core.network.*
 import jp.mobgits.lab.core.model.GitLabServer
 
-class AppGraph private constructor(context: Context) {
+class AppGraph private constructor(private val context: Context) {
     val preferences = AppPreferences(context)
     val sessions = OAuthSessionManager(context, preferences)
     val database = MobDatabase.create(context)
     val transport = GitLabTransport(preferences, sessions)
     val resources = ResourceRepository(transport, database.resources())
     suspend fun initialize() {
+        // Legacy single-account PAT/OAuth data is intentionally not reused. Re-authenticate with PKCE.
+        context.getSharedPreferences("mobgits_auth", Context.MODE_PRIVATE).edit().clear().commit()
         if (preferences.snapshot().servers.none { it.isGitLabCom }) preferences.saveServer(GitLabServer.create("https://gitlab.com", BuildConfig.GITLAB_CLIENT_ID, "GitLab.com"))
         sessions.restore()
     }

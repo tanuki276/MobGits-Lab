@@ -13,9 +13,9 @@ import okhttp3.*
 import org.json.JSONObject
 import java.time.Instant
 
-class OAuthSessionManager(context: Context, private val accounts: AccountRepository) : SessionManager {
+class OAuthSessionManager internal constructor(context: Context, private val accounts: AccountRepository,
+    private val client: OkHttpClient = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build()) : SessionManager {
     private val secure = EncryptedSessionStore(context)
-    private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build()
     private val mutex = Mutex()
     private val state = MutableStateFlow<SessionStatus>(SessionStatus.SignedOut)
     override val status = state.asStateFlow()
@@ -76,15 +76,15 @@ class OAuthSessionManager(context: Context, private val accounts: AccountReposit
         val account = directory.accounts.singleOrNull { it.id == accountId } ?: throw ApiFailure(FailureKind.AUTHENTICATION)
         val server = directory.servers.single { it.id == account.serverId }
         val old = try { secure.read(accountId) } catch (_: Exception) { null }
-        if (old == null) { state.value = SessionStatus.ReauthenticationRequired(accountId); throw ApiFailure(FailureKind.AUTHENTICATION) }
+        if (old == null) { if (account.isActive) state.value = SessionStatus.ReauthenticationRequired(accountId); throw ApiFailure(FailureKind.AUTHENTICATION) }
         if (!old.needsRefresh(Instant.now()) && (rejectedToken == null || rejectedToken != old.accessToken)) return@withLock old.accessToken
-        val refresh = old.refreshToken ?: run { state.value = SessionStatus.ReauthenticationRequired(accountId); throw ApiFailure(FailureKind.AUTHENTICATION) }
+        val refresh = old.refreshToken ?: run { if (account.isActive) state.value = SessionStatus.ReauthenticationRequired(accountId); throw ApiFailure(FailureKind.AUTHENTICATION) }
         try {
             val next = session(accountId, token(server, mapOf("grant_type" to "refresh_token", "refresh_token" to refresh, "redirect_uri" to redirect)), refresh)
-            secure.write(next); state.value = SessionStatus.Authenticated(account); next.accessToken
+            secure.write(next); if (account.isActive) state.value = SessionStatus.Authenticated(account); next.accessToken
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            state.value = if (e is ApiFailure && e.kind == FailureKind.AUTHENTICATION) SessionStatus.ReauthenticationRequired(accountId) else SessionStatus.TemporarilyUnavailable(accountId)
+            if (account.isActive) state.value = if (e is ApiFailure && e.kind == FailureKind.AUTHENTICATION) SessionStatus.ReauthenticationRequired(accountId) else SessionStatus.TemporarilyUnavailable(accountId)
             throw e
         }
     } }
