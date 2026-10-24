@@ -76,6 +76,7 @@ class CollaborationUseCase(private val data: Resources) {
         val latest = detail(account, d)
         check(!latest.offline && reviewed.complete && refs(latest.value) == reviewed) { "差分が更新されました。読み直してください" }
         check(latest.value.text("state") == "opened") { "このMRは開いていません" }
+        if (action == "merge" && latest.value.optJSONObject("user")?.optBoolean("can_merge") != true) throw ApiFailure(FailureKind.FORBIDDEN)
         if (action == "merge") check(!latest.value.optBoolean("draft") && latest.value.text("detailed_merge_status") == "mergeable") { "マージ条件が揃っていません" }
         data.write(account, "${entityPath(d)}/$action", if (action == "merge") "PUT" else "POST", mapOf("sha" to reviewed.head))
     }

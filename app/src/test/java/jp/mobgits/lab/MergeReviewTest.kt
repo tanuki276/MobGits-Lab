@@ -60,4 +60,5 @@ class MergeReviewTest {
         assertFalse(detail.copy(mergeStatus = "ci_still_running").mergeable)
     }
 
+    private fun detail() = ReviewDetail(7, "Review", "", "feature", "main", "opened", false, refs, "mergeable", true)
 }

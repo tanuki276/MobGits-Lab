@@ -57,7 +57,7 @@ import org.json.JSONObject
                         item { ConfirmAction(if (state.approval?.optBoolean("user_has_approved") == true) "Unapprove" else "Approve", ready && state.approval != null && (state.approval?.optBoolean("user_can_approve") == true || state.approval?.optBoolean("user_has_approved") == true)) {
                             vm.review(if (state.approval?.optBoolean("user_has_approved") == true) "unapprove" else "approve", vm.refs())
                         } }
-                        item { val refs = vm.refs(); ConfirmAction("Merge", ready && refs.complete && !value.optBoolean("draft") && value.text("detailed_merge_status") == "mergeable", "${value.text("source_branch")} → ${value.text("target_branch")}\n確認したSHA: ${refs.head.take(12)}") { vm.review("merge", refs) } }
+                        item { val refs = vm.refs(); ConfirmAction("Merge", ready && refs.complete && value.optJSONObject("user")?.optBoolean("can_merge") == true && !value.optBoolean("draft") && value.text("detailed_merge_status") == "mergeable", "${value.text("source_branch")} → ${value.text("target_branch")}\n確認したSHA: ${refs.head.take(12)}") { vm.review("merge", refs) } }
                     }
                     item { CommentEditor(vm) }
                 }

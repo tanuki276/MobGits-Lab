@@ -21,7 +21,7 @@ data class UiState(
     val loading: Boolean = true, val submitting: Boolean = false, val offline: Boolean = false,
     val error: String? = null, val notice: String? = null, val file: String? = null,
     val log: List<String> = emptyList(), val logOffset: Long = 0, val logEnd: Boolean = false,
-    val needsRefresh: Boolean = false, val apiStatus: String = "未確認"
+    val completedDraft: String? = null, val needsRefresh: Boolean = false, val apiStatus: String = "未確認"
 )
 
 class AppViewModel @JvmOverloads constructor(app: Application, private val saved: SavedStateHandle,
@@ -106,7 +106,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         if (state.submitting || state.offline || state.loading || state.needsRefresh) return
         val id = runCatching { account() }.getOrElse { return }
         val d = state.route; val current = ++epoch; loadJob?.cancel()
-        state = state.copy(submitting = true, error = null, notice = null)
+        state = state.copy(submitting = true, error = null, notice = null, completedDraft = null)
         viewModelScope.launch {
             try { action(id, d); if (current == epoch) { state = state.copy(submitting = false, notice = message); reload() } }
             catch (e: CancellationException) { throw e }
@@ -114,7 +114,16 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         }
     }
     fun save(fields: Map<String, String>, create: Boolean = false) = mutate("保存しました") { id, d -> use.save(id, d, fields, create); Unit }
-    fun comment(body: String, thread: String? = null, position: ReviewPosition? = null) = mutate("コメントを投稿しました") { id, d -> use.comment(id, d, body, thread, position) }
+    fun draftKey(thread: String?, position: ReviewPosition?) = "draft:${state.directory.activeAccount?.id}:${state.route.encode()}:$thread:$position"
+    fun draft(key: String): String = saved[key] ?: ""
+    fun setDraft(key: String, body: String) { saved[key] = body }
+    fun comment(body: String, thread: String? = null, position: ReviewPosition? = null) {
+        val key = draftKey(thread, position)
+        mutate("コメントを投稿しました") { id, d ->
+            use.comment(id, d, body, thread, position)
+            saved[key] = ""; state = state.copy(completedDraft = key)
+        }
+    }
     fun resolve(thread: String, value: Boolean) = mutate("スレッドを更新しました") { id, d -> use.resolve(id, d, thread, value) }
     fun review(action: String, refs: DiffRefs) = mutate("操作が完了しました") { id, d -> use.review(id, d, refs, action) }
     fun jobAction(action: String) = mutate("ジョブを更新しました") { id, d ->

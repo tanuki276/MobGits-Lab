@@ -12,7 +12,7 @@ import org.junit.Test
 class CollaborationTest {
     private val d = Destination("mr", 42, 7)
     private val refs = DiffRefs("base", "start", "head")
-    private fun detail(head: String = "head") = JSONObject().put("state", "opened").put("detailed_merge_status", "mergeable").put("diff_refs",
+    private fun detail(head: String = "head") = JSONObject().put("user", JSONObject().put("can_merge", true)).put("state", "opened").put("detailed_merge_status", "mergeable").put("diff_refs",
         JSONObject().put("base_sha", "base").put("start_sha", "start").put("head_sha", head)).toString()
     @Test fun approvalAndMergeCarryReviewedShaAndCorrectMethod() = runBlocking {
         for (action in listOf("approve", "merge", "unapprove")) {
