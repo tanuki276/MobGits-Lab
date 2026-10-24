@@ -162,6 +162,42 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun createProject(input: ProjectMutation) {
+        val auth = state.auth ?: return
+        state = state.copy(loading = true, error = null)
+        viewModelScope.launch {
+            runCatching { api.createProject(freshAuth(auth), input) }
+                .onSuccess { project ->
+                    state = state.copy(
+                        loading = false,
+                        projects = listOf(project) + state.projects.filterNot { it.id == project.id },
+                        screen = RootScreen.PROJECTS,
+                        message = "${project.name} を作成しました"
+                    )
+                }
+                .onFailure { state = state.copy(loading = false, error = it.message ?: "プロジェクトを作成できませんでした") }
+        }
+    }
+
+    fun updateProject(input: ProjectMutation) {
+        val auth = state.auth ?: return
+        val current = state.selectedProject ?: return
+        state = state.copy(loading = true, error = null)
+        viewModelScope.launch {
+            runCatching { api.updateProject(freshAuth(auth), current.id, input) }
+                .onSuccess { updated ->
+                    state = state.copy(
+                        loading = false,
+                        selectedProject = updated,
+                        projects = state.projects.map { if (it.id == updated.id) updated else it },
+                        searchResults = state.searchResults.map { if (it.id == updated.id) updated else it },
+                        message = "プロジェクト設定を更新しました"
+                    )
+                }
+                .onFailure { state = state.copy(loading = false, error = it.message ?: "プロジェクトを更新できませんでした") }
+        }
+    }
+
     fun openProject(project: GitLabProject) {
         val auth = state.auth ?: return
         state = state.copy(selectedProject = project, loading = true, repositoryPath = "", openedFile = null, fileContent = null)
@@ -226,6 +262,10 @@ class MobGitsViewModel(application: Application) : AndroidViewModel(application)
     fun clearError() {
         state = state.copy(error = null)
     }
+
+    fun clearMessage() {
+        state = state.copy(message = null)
+    }
 }
 
 private data class SessionData(val auth: StoredAuth, val user: GitLabUser, val projects: List<GitLabProject>, val todos: List<GitLabTodo>)
@@ -250,5 +290,6 @@ data class AppState(
     val openedFile: GitLabTreeItem? = null,
     val fileContent: String? = null,
     val loading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val message: String? = null
 )

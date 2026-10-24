@@ -62,6 +62,12 @@ fun MobGitsApp(vm: MobGitsViewModel, openBrowser: (Uri) -> Unit) {
             vm.clearError()
         }
     }
+    LaunchedEffect(state.message) {
+        state.message?.let {
+            snackbar.showSnackbar(it)
+            vm.clearMessage()
+        }
+    }
 
     when {
         state.auth == null -> LoginScreen(state.loading, snackbar, { vm.startOAuth()?.let(openBrowser) }, vm::loginPat)
@@ -133,9 +139,21 @@ private fun RootShell(state: AppState, snackbar: SnackbarHostState, vm: MobGitsV
         RootScreen.SEARCH to (Icons.Default.Search to "検索"),
         RootScreen.PROFILE to (Icons.Default.Person to "プロフィール")
     )
+    var showCreateProject by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(rootTitle(state.screen)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(rootTitle(state.screen)) },
+                actions = {
+                    if (state.screen == RootScreen.PROJECTS) {
+                        IconButton(onClick = { showCreateProject = true }) {
+                            Icon(Icons.Default.Add, "プロジェクトを作成")
+                        }
+                    }
+                }
+            )
+        },
         bottomBar = {
             NavigationBar {
                 tabs.forEach { (screen, pair) ->
@@ -160,6 +178,19 @@ private fun RootShell(state: AppState, snackbar: SnackbarHostState, vm: MobGitsV
             }
             if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
+    }
+
+    if (showCreateProject) {
+        ProjectEditorDialog(
+            title = "新しいプロジェクト",
+            initial = null,
+            allowPath = true,
+            onDismiss = { showCreateProject = false },
+            onSave = {
+                showCreateProject = false
+                vm.createProject(it)
+            }
+        )
     }
 }
 
@@ -196,7 +227,7 @@ private fun InboxScreen(todos: List<GitLabTodo>, markDone: (Long) -> Unit) {
 
 @Composable
 private fun ProjectList(projects: List<GitLabProject>, onOpen: (GitLabProject) -> Unit) {
-    if (projects.isEmpty()) return EmptyState("プロジェクトがありません", "参加中のGitLabプロジェクトがここに表示されます")
+    if (projects.isEmpty()) return EmptyState("プロジェクトがありません", "右上の＋から新しいプロジェクトを作成できます")
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(projects, key = { it.id }) { ProjectCard(it, onOpen) }
     }
@@ -209,7 +240,7 @@ private fun ProjectCard(project: GitLabProject, onOpen: (GitLabProject) -> Unit)
             Text(project.name, fontWeight = FontWeight.Bold)
             Text(project.pathWithNamespace, style = MaterialTheme.typography.bodySmall)
             if (project.description.isNotBlank() && project.description != "null") Text(project.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("★ ${project.stars}  ·  ${project.defaultBranch}", style = MaterialTheme.typography.labelMedium)
+            Text("${project.visibility.label}  ·  ★ ${project.stars}  ·  ${project.defaultBranch}", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -256,6 +287,7 @@ private fun ProfileScreen(state: AppState, logout: () -> Unit) {
 private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobGitsViewModel) {
     val project = state.selectedProject ?: return
     var tab by remember { mutableIntStateOf(0) }
+    var showEditor by remember { mutableStateOf(false) }
     val tabs = listOf("コード", "Issue", "MR", "CI/CD")
 
     if (state.openedFile != null) {
@@ -285,7 +317,12 @@ private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobG
         topBar = {
             TopAppBar(
                 title = { Column { Text(project.name); Text(project.pathWithNamespace, style = MaterialTheme.typography.labelSmall) } },
-                navigationIcon = { IconButton(onClick = vm::closeProject) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } }
+                navigationIcon = { IconButton(onClick = vm::closeProject) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } },
+                actions = {
+                    IconButton(onClick = { showEditor = true }) {
+                        Icon(Icons.Default.Edit, "プロジェクトを編集")
+                    }
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -305,6 +342,114 @@ private fun ProjectScreen(state: AppState, snackbar: SnackbarHostState, vm: MobG
             }
         }
     }
+
+    if (showEditor) {
+        ProjectEditorDialog(
+            title = "プロジェクト設定",
+            initial = project,
+            allowPath = false,
+            onDismiss = { showEditor = false },
+            onSave = {
+                showEditor = false
+                vm.updateProject(it)
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProjectEditorDialog(
+    title: String,
+    initial: GitLabProject?,
+    allowPath: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (ProjectMutation) -> Unit
+) {
+    var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
+    var path by remember(initial?.id) { mutableStateOf("") }
+    var description by remember(initial?.id) { mutableStateOf(initial?.description?.takeUnless { it == "null" }.orEmpty()) }
+    var visibility by remember(initial?.id) { mutableStateOf(initial?.visibility ?: ProjectVisibility.PRIVATE) }
+    var initializeReadme by remember(initial?.id) { mutableStateOf(true) }
+    var visibilityMenu by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("プロジェクト名") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (allowPath) {
+                    OutlinedTextField(
+                        value = path,
+                        onValueChange = { path = it },
+                        label = { Text("URLパス（任意）") },
+                        supportingText = { Text("空欄ならGitLabが自動生成します") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("説明") },
+                    minLines = 2,
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Box {
+                    OutlinedButton(onClick = { visibilityMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Visibility, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("公開範囲: ${visibility.label}")
+                    }
+                    DropdownMenu(expanded = visibilityMenu, onDismissRequest = { visibilityMenu = false }) {
+                        ProjectVisibility.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    visibility = option
+                                    visibilityMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+                if (allowPath) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = initializeReadme, onCheckedChange = { initializeReadme = it })
+                        Column {
+                            Text("READMEで初期化")
+                            Text("作成直後からmainブランチを使えます", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(
+                        ProjectMutation(
+                            name = name,
+                            path = path,
+                            description = description,
+                            visibility = visibility,
+                            initializeWithReadme = initializeReadme
+                        )
+                    )
+                },
+                enabled = name.isNotBlank()
+            ) { Text(if (initial == null) "作成" else "保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } }
+    )
 }
 
 @Composable

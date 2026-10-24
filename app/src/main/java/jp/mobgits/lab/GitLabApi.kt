@@ -31,6 +31,28 @@ class GitLabApi {
             .mapObjects(::projectFromJson)
     }
 
+    suspend fun createProject(auth: StoredAuth, input: ProjectMutation): GitLabProject = withContext(Dispatchers.IO) {
+        require(input.name.isNotBlank()) { "プロジェクト名を入力してください" }
+        val form = linkedMapOf(
+            "name" to input.name.trim(),
+            "description" to input.description.trim(),
+            "visibility" to input.visibility.apiValue,
+            "initialize_with_readme" to input.initializeWithReadme.toString()
+        )
+        input.path.trim().takeIf { it.isNotBlank() }?.let { form["path"] = it }
+        projectFromJson(JSONObject(request(auth, "/api/v4/projects", "POST", form)))
+    }
+
+    suspend fun updateProject(auth: StoredAuth, projectId: Long, input: ProjectMutation): GitLabProject = withContext(Dispatchers.IO) {
+        require(input.name.isNotBlank()) { "プロジェクト名を入力してください" }
+        val form = linkedMapOf(
+            "name" to input.name.trim(),
+            "description" to input.description.trim(),
+            "visibility" to input.visibility.apiValue
+        )
+        projectFromJson(JSONObject(request(auth, "/api/v4/projects/$projectId", "PUT", form)))
+    }
+
     suspend fun todos(auth: StoredAuth): List<GitLabTodo> = withContext(Dispatchers.IO) {
         JSONArray(get(auth, "/api/v4/todos?state=pending&per_page=50")).mapObjects { json ->
             val target = json.optJSONObject("target")
@@ -118,12 +140,18 @@ class GitLabApi {
         webUrl = json.optString("web_url"),
         stars = json.optInt("star_count"),
         lastActivityAt = json.optString("last_activity_at"),
-        defaultBranch = json.optString("default_branch", "main")
+        defaultBranch = json.optString("default_branch", "main").ifBlank { "main" },
+        visibility = ProjectVisibility.fromApi(json.optString("visibility"))
     )
 
     private fun get(auth: StoredAuth, path: String): String = request(auth, path, "GET")
 
-    private fun request(auth: StoredAuth, path: String, method: String): String {
+    private fun request(
+        auth: StoredAuth,
+        path: String,
+        method: String,
+        form: Map<String, String> = emptyMap()
+    ): String {
         val normalized = normalizeBaseUrl(auth.baseUrl)
         val connection = (URL(normalized + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
@@ -135,16 +163,28 @@ class GitLabApi {
                 AuthType.OAUTH -> setRequestProperty("Authorization", "Bearer ${auth.accessToken}")
                 AuthType.PAT -> setRequestProperty("PRIVATE-TOKEN", auth.accessToken)
             }
-            if (method == "POST") doOutput = true
+            if (method == "POST" || method == "PUT" || method == "PATCH") {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            }
         }
 
         return try {
-            if (method == "POST") connection.outputStream.use { }
+            if (connection.doOutput) {
+                val body = form.entries.joinToString("&") { "${encode(it.key)}=${encode(it.value)}" }
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (code !in 200..299) {
-                val detail = runCatching { JSONObject(body).optString("message") }.getOrNull()
+                val detail = runCatching {
+                    when (val message = JSONObject(body).opt("message")) {
+                        is String -> message
+                        is JSONObject -> message.toString()
+                        else -> null
+                    }
+                }.getOrNull()
                 throw GitLabApiException(code, detail?.takeIf { it.isNotBlank() } ?: "GitLab API エラー")
             }
             body
@@ -152,6 +192,8 @@ class GitLabApi {
             connection.disconnect()
         }
     }
+
+    private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 
     private fun normalizeBaseUrl(value: String): String {
         val trimmed = value.trim().trimEnd('/')
@@ -175,8 +217,25 @@ data class GitLabProject(
     val webUrl: String,
     val stars: Int,
     val lastActivityAt: String,
-    val defaultBranch: String
+    val defaultBranch: String,
+    val visibility: ProjectVisibility
 )
+data class ProjectMutation(
+    val name: String,
+    val path: String = "",
+    val description: String = "",
+    val visibility: ProjectVisibility = ProjectVisibility.PRIVATE,
+    val initializeWithReadme: Boolean = true
+)
+enum class ProjectVisibility(val apiValue: String, val label: String) {
+    PRIVATE("private", "非公開"),
+    INTERNAL("internal", "内部"),
+    PUBLIC("public", "公開");
+
+    companion object {
+        fun fromApi(value: String): ProjectVisibility = entries.firstOrNull { it.apiValue == value } ?: PRIVATE
+    }
+}
 data class GitLabIssue(val iid: Long, val title: String, val author: String, val labels: List<String>, val description: String, val webUrl: String)
 data class GitLabMergeRequest(val iid: Long, val title: String, val author: String, val sourceBranch: String, val targetBranch: String, val draft: Boolean, val description: String, val webUrl: String)
 data class GitLabPipeline(val id: Long, val status: String, val ref: String, val webUrl: String, val updatedAt: String)
