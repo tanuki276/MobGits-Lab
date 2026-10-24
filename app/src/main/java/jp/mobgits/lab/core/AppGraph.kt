@@ -17,7 +17,7 @@ class AppGraph private constructor(private val context: Context) {
     suspend fun initialize() {
         // Legacy single-account PAT/OAuth data is intentionally not reused. Re-authenticate with PKCE.
         context.getSharedPreferences("mobgits_auth", Context.MODE_PRIVATE).edit().clear().commit()
-        if (preferences.snapshot().servers.none { it.isGitLabCom }) preferences.saveServer(GitLabServer.create("https://gitlab.com", BuildConfig.GITLAB_CLIENT_ID, "GitLab.com"))
+        if (preferences.snapshot().servers.none { it.isGitLabCom && it.oauthClientId == BuildConfig.GITLAB_CLIENT_ID }) preferences.saveServer(GitLabServer.create("https://gitlab.com", BuildConfig.GITLAB_CLIENT_ID, "GitLab.com"))
         sessions.restore()
     }
     companion object {
