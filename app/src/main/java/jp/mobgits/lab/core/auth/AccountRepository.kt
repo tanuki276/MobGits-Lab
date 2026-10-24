@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 interface AccountRepository {
     val directory: Flow<AccountDirectory>
     suspend fun saveServer(server: GitLabServer)
+    suspend fun snapshot(): AccountDirectory
+    suspend fun saveAccount(account: GitLabAccount)
     suspend fun activate(accountId: String)
     suspend fun remove(accountId: String)
 }
