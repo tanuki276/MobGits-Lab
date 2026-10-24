@@ -14,6 +14,12 @@ class AppGraph private constructor(private val context: Context) {
     val database = MobDatabase.create(context)
     val transport = GitLabTransport(preferences, sessions, StoredRateLimits(context))
     val resources = ResourceRepository(transport, database.resources())
+    // Public OAuth identifiers, provisioned by the app distributor per GitLab instance.
+    fun oauthClientId(baseUrl: String): String {
+        if (baseUrl == "https://gitlab.com") return BuildConfig.GITLAB_CLIENT_ID
+        val configured = context.assets.open("oauth-servers.json").bufferedReader().use { org.json.JSONObject(it.readText()) }
+        return configured.optString(baseUrl)
+    }
     suspend fun initialize() {
         // Legacy single-account PAT/OAuth data is intentionally not reused. Re-authenticate with PKCE.
         context.getSharedPreferences("mobgits_auth", Context.MODE_PRIVATE).edit().clear().commit()

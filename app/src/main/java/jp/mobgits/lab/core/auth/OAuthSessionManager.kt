@@ -23,7 +23,7 @@ class OAuthSessionManager internal constructor(context: Context, private val acc
 
     override suspend fun beginLogin(serverId: String): String = withContext(Dispatchers.IO) { mutex.withLock {
         val server = accounts.snapshot().servers.single { it.id == serverId }
-        require(server.oauthConfigured) { "この接続先のOAuth Client IDを開発者設定で登録してください" }
+        require(server.oauthConfigured) { "このGitLabは接続準備中です。管理者に接続設定を依頼してください。" }
         val verifier = Pkce.random(64); val nonce = Pkce.random(32)
         secure.put("pending", JSONObject().apply {
             put("server", server.id); put("url", server.baseUrl); put("client", server.oauthClientId)

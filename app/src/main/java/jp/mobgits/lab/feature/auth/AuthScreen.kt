@@ -18,7 +18,6 @@ import jp.mobgits.lab.R
 fun AuthScreen(vm: AppViewModel, open: (String) -> Unit) {
     val state = vm.state
     var url by rememberSaveable { mutableStateOf("https://gitlab.com") }
-    var client by rememberSaveable { mutableStateOf("") }
     var advanced by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
     LazyColumn(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -38,7 +37,7 @@ fun AuthScreen(vm: AppViewModel, open: (String) -> Unit) {
         }
         items(state.directory.servers, key = { it.id }) { server ->
             Button(onClick = { vm.login(server.id, open) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = server.oauthConfigured) { Text("${server.displayName}でログイン") }
-            if (!server.oauthConfigured) Text("この接続先のOAuth登録が必要です。管理者からClient IDを取得し、接続先設定へ登録してください。")
+            if (!server.oauthConfigured) Text("この接続先は管理者による接続設定の準備が必要です。")
         }
         item {
             TextButton(onClick = { advanced = !advanced }) { Text("会社・自分のGitLabに接続") }
@@ -47,11 +46,7 @@ fun AuthScreen(vm: AppViewModel, open: (String) -> Unit) {
             OutlinedTextField(url, { url = it }, label = { Text("GitLabのURL") }, singleLine = true)
             OutlinedTextField(name, { name = it }, label = { Text("接続先の表示名（任意）") })
 
-            if (advanced) {
-                OutlinedTextField(client, { client = it }, label = { Text("OAuth Client ID") }, singleLine = true)
-                Text("管理者が用意したClient IDを入力してください。リダイレクトURI: mobgits://oauth/callback")
-            }
-            OutlinedButton(onClick = { vm.addServer(url, client, name) }, enabled = url.isNotBlank()) { Text("接続先を登録") }
+            OutlinedButton(onClick = { vm.addServer(url, name) }, enabled = url.isNotBlank()) { Text("接続先を登録") }
             }
         }
     }

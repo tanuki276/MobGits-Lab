@@ -158,10 +158,12 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
     fun callback(uri: String) = authOperation { resetAccountScope(); graph.sessions.completeLogin(uri); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun switch(id: String) = authOperation { resetAccountScope(); graph.sessions.switchAccount(id); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
     fun logout(id: String) = authOperation { resetAccountScope(); graph.sessions.signOut(id); graph.resources.clear(id); state = state.copy(directory = graph.preferences.snapshot()); navigate(Destination(), true) }
-    fun addServer(url: String, client: String, name: String) = authOperation {
-        val value = GitLabServer.create(url, client, name)
-        val previous = graph.preferences.snapshot().servers.find { it.id == value.id }
-        graph.preferences.saveServer(if (client.isBlank() && previous != null) value.copy(oauthClientId = previous.oauthClientId) else value)
+    fun addServer(url: String, name: String) = authOperation {
+        val canonical = GitLabServer.normalizeBaseUrl(url)
+        val previous = graph.preferences.snapshot().servers.find { it.baseUrl == canonical }
+        val client = graph.oauthClientId(canonical).ifBlank { previous?.oauthClientId.orEmpty() }
+        require(client.isNotBlank()) { "このGitLabは接続準備中です。管理者にMobGitsの接続設定を依頼してください。" }
+        graph.preferences.saveServer(GitLabServer.create(canonical, client, name))
         state = state.copy(directory = graph.preferences.snapshot())
     }
     fun flag(key: String, value: Boolean) = authOperation { graph.preferences.setFlag(key, value) }
