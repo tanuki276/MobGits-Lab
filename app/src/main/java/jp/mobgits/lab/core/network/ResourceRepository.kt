@@ -8,8 +8,14 @@ import org.json.JSONObject
 import java.net.URLEncoder
 
 data class Resource(val json: String, val offline: Boolean, val nextPage: Int? = null)
-class ResourceRepository(private val remote: GitLabTransport, private val cache: ResourceDao) {
-    suspend fun read(account: String, path: String, cached: Boolean = true): Resource = withContext(Dispatchers.IO) {
+interface Resources {
+    suspend fun read(account: String, path: String, cached: Boolean = true): Resource
+    suspend fun write(account: String, path: String, method: String, fields: Map<String, String> = emptyMap()): String
+    suspend fun log(account: String, project: Long, job: Long, offset: Long): LogChunk
+    suspend fun clear(account: String)
+}
+class ResourceRepository(private val remote: NetworkSource, private val cache: ResourceDao) : Resources {
+    override suspend fun read(account: String, path: String, cached: Boolean): Resource = withContext(Dispatchers.IO) {
         try {
             val result = remote.request(account, path)
             if (cached) {
@@ -24,13 +30,13 @@ class ResourceRepository(private val remote: GitLabTransport, private val cache:
             throw e
         }
     }
-    suspend fun write(account: String, path: String, method: String, fields: Map<String, String> = emptyMap()): String = withContext(Dispatchers.IO) {
+    override suspend fun write(account: String, path: String, method: String, fields: Map<String, String>): String = withContext(Dispatchers.IO) {
         val result = remote.request(account, path, method, fields).body
         cache.clear(account) // Never return a stale detail after a successful write.
         result
     }
-    suspend fun log(account: String, project: Long, job: Long, offset: Long) = withContext(Dispatchers.IO) { remote.logChunk(account, project, job, offset) }
-    suspend fun clear(account: String) = cache.clear(account)
+    override suspend fun log(account: String, project: Long, job: Long, offset: Long) = withContext(Dispatchers.IO) { remote.logChunk(account, project, job, offset) }
+    override suspend fun clear(account: String) = cache.clear(account)
 }
 fun query(value: String) = URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 fun JSONArray.objects(): List<JSONObject> = List(length()) { getJSONObject(it) }

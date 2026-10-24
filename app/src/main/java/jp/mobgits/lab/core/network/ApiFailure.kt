@@ -19,6 +19,8 @@ class ApiFailure(val kind: FailureKind, val status: Int = 0, val retryAfterSecon
             401 -> FailureKind.AUTHENTICATION; 403 -> FailureKind.FORBIDDEN; 404 -> FailureKind.NOT_FOUND
             409, 412, 422 -> FailureKind.CONFLICT; 429 -> FailureKind.RATE_LIMIT
             in 500..599 -> FailureKind.SERVER; else -> FailureKind.INVALID
-        }, status, retry?.toLongOrNull()?.coerceAtLeast(1))
+        }, status, retry?.toLongOrNull()?.coerceAtLeast(1) ?: retry?.let {
+            runCatching { java.time.Duration.between(java.time.Instant.now(), java.time.ZonedDateTime.parse(it, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()).seconds.coerceAtLeast(1) }.getOrNull()
+        })
     }
 }

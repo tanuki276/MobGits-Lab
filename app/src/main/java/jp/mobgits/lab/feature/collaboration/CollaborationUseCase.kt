@@ -15,7 +15,7 @@ data class ListFilter(val state: String = "opened", val scope: String = "all", v
 data class EntityPage(val entries: List<JSONObject>, val next: Int?, val offline: Boolean)
 data class Detail(val value: JSONObject, val offline: Boolean)
 
-class CollaborationUseCase(private val data: ResourceRepository) {
+class CollaborationUseCase(private val data: Resources) {
     private fun root(d: Destination): String = "/api/v4/projects/${d.project}"
     fun entityPath(d: Destination): String = when (d.kind) {
         "issue" -> "${root(d)}/issues/${d.id}"
@@ -35,7 +35,7 @@ class CollaborationUseCase(private val data: ResourceRepository) {
                 (if (filter.assignee.isNotBlank()) "&assignee_username[]=${query(filter.assignee)}" else "") +
                 (if (filter.milestone.isNotBlank()) "&milestone=${query(filter.milestone)}" else "")
             "mrs" -> "${root(d)}/merge_requests?state=${query(filter.state)}&scope=${query(filter.scope)}&search=${query(filter.search)}"
-            "pipelines" -> "${root(d)}/pipelines?order_by=id&sort=desc"
+            "pipelines" -> if (d.path == "mr") "${root(d)}/merge_requests/${d.id}/pipelines?sort=desc" else "${root(d)}/pipelines?order_by=id&sort=desc"
             "jobs" -> "${root(d)}/pipelines/${d.id}/jobs?include_retried=false"
             "commits" -> "${root(d)}/merge_requests/${d.id}/commits?order=default"
             "discussions" -> "${root(d)}/${if (d.path == "issue") "issues" else "merge_requests"}/${d.id}/discussions?order_by=created_at"
@@ -47,9 +47,9 @@ class CollaborationUseCase(private val data: ResourceRepository) {
             "milestones" -> "${root(d)}/milestones?state=active"
             else -> error("Unknown list")
         }
-        val response = data.read(account, "$endpoint&per_page=20&page=$page")
+        val response = data.read(account, "$endpoint&per_page=${if (d.kind == "diffs") 1 else 20}&page=$page")
         val values = JSONArray(response.json).objects()
-        return EntityPage(values, response.nextPage ?: if (values.size == 20) page + 1 else null, response.offline)
+        return EntityPage(values, response.nextPage ?: if (values.size == (if (d.kind == "diffs") 1 else 20)) page + 1 else null, response.offline)
     }
     suspend fun detail(account: String, d: Destination) = data.read(account, entityPath(d)).let { Detail(JSONObject(it.json), it.offline) }
     suspend fun file(account: String, d: Destination) = data.read(account, "${root(d)}/repository/files/${query(d.path)}/raw?ref=${query(d.ref)}")
@@ -76,12 +76,13 @@ class CollaborationUseCase(private val data: ResourceRepository) {
         val latest = detail(account, d)
         check(!latest.offline && reviewed.complete && refs(latest.value) == reviewed) { "差分が更新されました。読み直してください" }
         check(latest.value.text("state") == "opened") { "このMRは開いていません" }
+        if (action == "merge" && latest.value.optJSONObject("user")?.optBoolean("can_merge") != true) throw ApiFailure(FailureKind.FORBIDDEN)
         if (action == "merge") check(!latest.value.optBoolean("draft") && latest.value.text("detailed_merge_status") == "mergeable") { "マージ条件が揃っていません" }
         data.write(account, "${entityPath(d)}/$action", if (action == "merge") "PUT" else "POST", mapOf("sha" to reviewed.head))
     }
-    suspend fun jobAction(account: String, d: Destination, action: String) {
+    suspend fun jobAction(account: String, d: Destination, action: String): JSONObject {
         require(action in setOf("retry", "cancel"))
-        data.write(account, "${entityPath(d)}/$action", "POST")
+        return JSONObject(data.write(account, "${entityPath(d)}/$action", "POST"))
     }
     suspend fun log(account: String, d: Destination, offset: Long) = data.log(account, d.project, d.id, offset)
     suspend fun done(account: String, id: Long) { data.write(account, "/api/v4/todos/$id/mark_as_done", "POST") }
