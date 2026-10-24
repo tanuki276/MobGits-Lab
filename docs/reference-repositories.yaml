@@ -1,0 +1,68 @@
+schema_version: 1
+# Null review fields are intentional: these references have not been admitted as source code.
+# Before copying: pin a commit, verify its license, record review date and attribution.
+default_policy:
+  usage: architecture-and-behavior-reference-only
+  copy_code: false
+  review_required_before_copy: true
+references:
+  - repository: android/nowinandroid
+    url: https://github.com/android/nowinandroid
+    purpose: [architecture, compose, offline, testing]
+    pinned_commit: null
+    last_reviewed: null
+    license: Apache-2.0
+    license_verified_at: null
+    usage_policy: design-reference-only
+    copy_code: false
+    notes: Verify pinned source and attribution before adopting code.
+  - repository: android/architecture-samples
+    url: https://github.com/android/architecture-samples
+    purpose: [repository-pattern, viewmodel, flow]
+    pinned_commit: null
+    last_reviewed: null
+    license: Apache-2.0
+    license_verified_at: null
+    usage_policy: design-reference-only
+    copy_code: false
+    notes: Verify pinned source and attribution before adopting code.
+  - repository: gitlabhq/cli
+    url: https://github.com/gitlabhq/cli
+    purpose: [gitlab-api, multi-instance, merge-request, pipeline]
+    pinned_commit: null
+    last_reviewed: null
+    license: null
+    license_verified_at: null
+    usage_policy: behavior-reference-only
+    copy_code: false
+    notes: Confirm canonical upstream and pinned license before use.
+  - repository: gitlabhq/gitlabhq
+    url: https://github.com/gitlabhq/gitlabhq
+    purpose: [gitlab-behavior, permissions, merge-request-ux]
+    pinned_commit: null
+    last_reviewed: null
+    license: null
+    license_verified_at: null
+    usage_policy: behavior-reference-only
+    copy_code: false
+    notes: Check license per file and distinguish Community/Enterprise behavior.
+  - repository: openid/AppAuth-Android
+    url: https://github.com/openid/AppAuth-Android
+    purpose: [oauth, pkce, browser-auth]
+    pinned_commit: null
+    last_reviewed: null
+    license: null
+    license_verified_at: null
+    usage_policy: design-reference-only
+    copy_code: false
+    notes: Evaluate a library dependency separately from copying implementation.
+  - repository: maneeshacooray/Gitling
+    url: https://github.com/maneeshacooray/Gitling
+    purpose: [git-ui, editor]
+    pinned_commit: null
+    last_reviewed: null
+    license: null
+    license_verified_at: null
+    usage_policy: ux-reference-only
+    copy_code: false
+    notes: Do not copy source code or assets.

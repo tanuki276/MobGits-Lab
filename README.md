@@ -1,5 +1,7 @@
 # MobGits Lab
 
+開発方針: [CR1–CR3 チーム開発計画](docs/CR-PLAN.md)。新規feature PRはCR統合branchを対象にします。
+
 **MobGits Lab** は、日本語で使いやすいことを目指す非公式の GitLab Android クライアントです。
 
 > This project is not affiliated with, endorsed by, or sponsored by GitLab Inc.
