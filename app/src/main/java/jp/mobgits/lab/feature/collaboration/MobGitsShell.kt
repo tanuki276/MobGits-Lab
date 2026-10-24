@@ -63,6 +63,7 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
             }
             state.error?.let { Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) }
             state.notice?.let { Text(it, Modifier.padding(8.dp)) }
+            if (state.route.kind == "projects") TextButton(onClick = { vm.navigate(Destination("create-project")) }) { Text("プロジェクトを作成") }
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val contentModifier = if (maxWidth > 840.dp) Modifier.widthIn(max = 1000.dp).fillMaxHeight() else Modifier.fillMaxSize()
                 Box(contentModifier.align(Alignment.TopCenter)) {
@@ -70,7 +71,8 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
                         "settings" -> SettingsScreen(vm, open, biometric, notifications)
                         "project" -> ProjectOverview(vm)
                         "issue", "mr", "pipeline", "job" -> EntityDetailScreen(vm)
-                        "file" -> LazyColumn { item { SelectionContainer { Text(state.file.orEmpty(), Modifier.padding(16.dp), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace) } } }
+                        "file" -> RepositoryEditing(vm)
+                        "create-project" -> RepositoryEditing(vm, createProject = true)
                         else -> EntityListScreen(vm)
                     }
                 }
