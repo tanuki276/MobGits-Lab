@@ -41,14 +41,15 @@ class RepositoryFlowTest {
             compose.onNodeWithText("コミットを確認").performClick()
             compose.onNodeWithText("実行").performClick()
             compose.waitUntil(15000) { vm.workspace?.commit == "new-sha" && !vm.busy }
-            compose.onNodeWithText("Merge Requestを作成").performScrollTo().performClick()
+            compose.onNodeWithText("Merge Requestを作成").performScrollTo()
+            compose.saveScreenshot("repository-editing-light.png")
+            compose.onNodeWithText("Merge Requestを作成").performClick()
             compose.waitUntil(15000) { opened == 8L }
             assertEquals(1, fake.commits)
             assertEquals(1, fake.mrs)
             assertTrue(fake.json!!.getString("branch").startsWith("mobgits/"))
             assertEquals("base-sha", fake.json!!.getString("start_sha"))
             assertEquals("# Updated\n日本語の変更", fake.json!!.getJSONArray("actions").getJSONObject(0).getString("content"))
-            compose.saveScreenshot("repository-editing-light.png")
         } finally {
             InstrumentationRegistry.getInstrumentation().runOnMainSync { owner.clear() }
             runBlocking { draft.write(null) }

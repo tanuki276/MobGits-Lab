@@ -14,7 +14,7 @@ GitLab.com / Self-Managed GitLab向けの、日本語を中心とした非公式
 - account別Room cache、オフライン閲覧、Markdown、画像cache、テーマ、生体認証ロック
 
 実装範囲・検証と制約は [IMPLEMENTATION.md](docs/IMPLEMENTATION.md)。開発計画は [CR-PLAN.md](docs/CR-PLAN.md)。
-CR3の編集・Commit・branch/MR作成は今後の対象。
+CR3-Aでは編集・複数ファイルCommit・専用branch/MR作成に対応。ローカルGitエンジンはCR3-Bの対象。
 
 ## ビルド
 

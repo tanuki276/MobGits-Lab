@@ -57,7 +57,11 @@ fun ProjectCreationScreen(vm: AppViewModel) {
                         val id = RepositoryUseCase(vm.graph.resources).createProject(account, name, path, namespace, description, visibility)
                         vm.navigate(Destination("project", id), true)
                     }
-                } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; error = e.message }
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    if (e is ApiFailure && e.status in setOf(400, 401, 403, 404, 409, 422)) attempted = false
+                    error = e.message
+                }
                 finally { busy = false }
             }
         }) { Text("実行") } }, dismissButton = { TextButton(onClick = { confirm = false }) { Text("キャンセル") } })

@@ -75,7 +75,7 @@ Phone API 30 / tablet API 34:
 - [ ] 大規模MRとlogの端末別速度・メモリprofile
 - [ ] FCMを使用する場合、配信基盤の端末登録・認可・解除
 
-機能実装と実環境でのリリース判定は区別する。CR3の編集・Commit・branch/MR作成は含めない。
+機能実装と実環境でのリリース判定は区別する。CR3-Aの編集・Commit・branch/MR作成はv0.9.0-previewで追加。詳細と制限はRELEASE-0.9.mdを参照。
 
 ## CI実行記録
 
