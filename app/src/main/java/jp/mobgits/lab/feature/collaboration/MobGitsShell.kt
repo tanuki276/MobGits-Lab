@@ -71,8 +71,9 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
                         "settings" -> SettingsScreen(vm, open, biometric, notifications)
                         "project" -> ProjectOverview(vm)
                         "issue", "mr", "pipeline", "job" -> EntityDetailScreen(vm)
-                        "file" -> RepositoryEditing(vm)
-                        "create-project" -> RepositoryEditing(vm, createProject = true)
+                        "repository" -> jp.mobgits.lab.feature.repository.RepositoryScreen(vm)
+                        "file" -> LazyColumn { item { SelectionContainer { Text(state.file.orEmpty()) } } }
+                        "create-project" -> jp.mobgits.lab.feature.repository.ProjectCreationScreen(vm)
                         else -> EntityListScreen(vm)
                     }
                 }
@@ -86,7 +87,7 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
     val d = vm.state.route
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Markdown(value?.text("description").orEmpty()) }
-        item { listOf("issues" to "Issues", "mrs" to "Merge Requests", "pipelines" to "CI/CD", "tree" to "Repository").forEach { (kind, label) ->
+        item { listOf("issues" to "Issues", "mrs" to "Merge Requests", "pipelines" to "CI/CD", "repository" to "Repository").forEach { (kind, label) ->
             OutlinedButton(onClick = { vm.navigate(Destination(kind, d.project, ref = value?.text("default_branch")?.ifBlank { "main" } ?: "main")) }, modifier = Modifier.fillMaxWidth()) { Text(label) }
         } }
     }

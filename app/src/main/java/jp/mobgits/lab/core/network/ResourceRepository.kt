@@ -11,6 +11,7 @@ data class Resource(val json: String, val offline: Boolean, val nextPage: Int? =
 interface Resources {
     suspend fun read(account: String, path: String, cached: Boolean = true): Resource
     suspend fun write(account: String, path: String, method: String, fields: Map<String, String> = emptyMap()): String
+    suspend fun writeJson(account: String, path: String, json: String): String = error("JSON writes unsupported")
     suspend fun log(account: String, project: Long, job: Long, offset: Long): LogChunk
     suspend fun clear(account: String)
 }
@@ -34,6 +35,11 @@ class ResourceRepository(private val remote: NetworkSource, private val cache: R
         val result = remote.request(account, path, method, fields).body
         val entity = Regex("^(/api/v4/(?:projects/[^/]+/(?:issues|merge_requests|pipelines|jobs)|todos)/[0-9]+)(?:/|$)").find(path)?.groupValues?.get(1).orEmpty()
         cache.invalidate(account, entity, if (entity.isNotBlank()) entity.substringBeforeLast('/') else path.substringBefore('?'))
+        result
+    }
+    override suspend fun writeJson(account: String, path: String, json: String): String = withContext(Dispatchers.IO) {
+        val result = remote.request(account, path, "POST_JSON", mapOf("json" to json)).body
+        cache.clear(account)
         result
     }
     override suspend fun log(account: String, project: Long, job: Long, offset: Long) = withContext(Dispatchers.IO) { remote.logChunk(account, project, job, offset) }

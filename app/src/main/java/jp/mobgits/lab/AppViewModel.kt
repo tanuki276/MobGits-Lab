@@ -70,7 +70,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         val account = state.directory.activeAccount?.id
         val d = state.route
         val current = ++epoch; loadJob?.cancel()
-        if (account == null || d.kind in setOf("settings", "create-project")) { state = state.copy(loading = false); return }
+        if (account == null || d.kind in setOf("settings", "create-project", "repository")) { state = state.copy(loading = false); return }
         state = state.copy(loading = true, error = null)
         val start = state
         loadJob = viewModelScope.launch {

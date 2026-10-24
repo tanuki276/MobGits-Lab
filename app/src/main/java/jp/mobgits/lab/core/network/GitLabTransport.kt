@@ -5,6 +5,7 @@ import jp.mobgits.lab.core.auth.OAuthSessionManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.http.*
@@ -59,6 +60,7 @@ class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager
         val scope = scope(id); checkRate(id); val url = url(scope, path)
         val body = FormBody.Builder().apply { fields.forEach { (k, v) -> if (k.endsWith("[]")) v.split(',').forEach { add(k, it.trim()) } else add(k, v) } }.build()
         return execute(when (method) {
+            "POST_JSON" -> service.post(url, scope, fields.getValue("json").toRequestBody("application/json; charset=utf-8".toMediaType()))
             "GET" -> service.get(url, scope); "POST" -> service.post(url, scope, body)
             "PUT" -> service.put(url, scope, body); "DELETE" -> service.delete(url, scope)
             else -> error("Unsupported method")
