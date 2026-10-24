@@ -89,3 +89,10 @@ class CollaborationUseCase(private val data: Resources) {
     suspend fun done(account: String, id: Long) { data.write(account, "/api/v4/todos/$id/mark_as_done", "POST") }
     fun refs(json: JSONObject): DiffRefs = json.optJSONObject("diff_refs").let { DiffRefs(it?.text("base_sha").orEmpty(), it?.text("start_sha").orEmpty(), it?.text("head_sha").orEmpty()) }
 }
+
+/** Draft text survives a changed head, but posting still uses the explicitly selected SHA-bound position. */
+fun commentDraftKey(account: String?, route: Destination, thread: String?, position: ReviewPosition?): String =
+    "draft:" + listOf(account, route.encode(), thread, position?.oldPath, position?.newPath,
+        position?.oldLine?.toString(), position?.newLine?.toString()).joinToString("") {
+        if (it == null) "-1:" else it.length.toString() + ":" + it
+    }

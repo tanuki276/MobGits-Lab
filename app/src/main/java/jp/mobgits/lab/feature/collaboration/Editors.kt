@@ -96,6 +96,11 @@ import org.json.JSONObject
     var body by rememberSaveable(draftKey) { mutableStateOf(vm.draft(draftKey)) }
     LaunchedEffect(state.completedDraft) { if (state.completedDraft == draftKey) { body = ""; finished?.invoke() } }
     Column(Modifier.padding(12.dp)) {
+        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (state.needsRefresh) {
+            Text("差分が変わった場合は、下書きを保持したまま行を選び直してください。")
+            TextButton(onClick = { vm.reload() }, enabled = !state.loading && !state.submitting) { Text("再読み込み") }
+        }
         OutlinedTextField(body, { body = it; vm.setDraft(draftKey, it) }, label = { Text(if (thread == null) "コメント（Markdown）" else "このスレッドへ返信") }, minLines = 3, enabled = !state.submitting, modifier = Modifier.fillMaxWidth().testTag("comment-body"))
         Button(onClick = { vm.comment(body, thread, position) }, enabled = body.isNotBlank() && !state.submitting && !state.offline && !state.loading && !state.needsRefresh) { Text("投稿") }
     }

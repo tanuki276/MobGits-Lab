@@ -14,6 +14,13 @@ class CollaborationTest {
     private val refs = DiffRefs("base", "start", "head")
     private fun detail(head: String = "head") = JSONObject().put("user", JSONObject().put("can_merge", true)).put("state", "opened").put("detailed_merge_status", "mergeable").put("diff_refs",
         JSONObject().put("base_sha", "base").put("start_sha", "start").put("head_sha", head)).toString()
+    @Test fun draftsRemainAccountAndLineScopedAcrossChangedHeads() {
+        val first = ReviewPosition(refs, "old|path", "new", null, 8)
+        val updated = first.copy(refs = refs.copy(head = "new-head"))
+        assertEquals(commentDraftKey("a", d, null, first), commentDraftKey("a", d, null, updated))
+        assertNotEquals(commentDraftKey("a", d, null, first), commentDraftKey("b", d, null, first))
+        assertNotEquals(commentDraftKey("a", d, null, first), commentDraftKey("a", d, null, first.copy(newLine = 9)))
+    }
     @Test fun approvalAndMergeCarryReviewedShaAndCorrectMethod() = runBlocking {
         for (action in listOf("approve", "merge", "unapprove")) {
             val fake = Fake(mutableListOf(Resource(detail(), false)))

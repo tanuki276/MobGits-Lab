@@ -116,7 +116,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         }
     }
     fun save(fields: Map<String, String>, create: Boolean = false) = mutate("保存しました") { id, d -> use.save(id, d, fields, create); Unit }
-    fun draftKey(thread: String?, position: ReviewPosition?) = "draft:${state.directory.activeAccount?.id}:${state.route.encode()}:$thread:$position"
+    fun draftKey(thread: String?, position: ReviewPosition?) = commentDraftKey(state.directory.activeAccount?.id, state.route, thread, position)
     fun draft(key: String): String = saved[key] ?: ""
     fun setDraft(key: String, body: String) { saved[key] = body }
     fun comment(body: String, thread: String? = null, position: ReviewPosition? = null) {
