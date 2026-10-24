@@ -46,3 +46,10 @@ CIはUnit / lint / APK、phone API 30 / tablet API 34のcritical flowとforce-st
 参照先とコピー禁止方針は [reference-repositories.yaml](docs/reference-repositories.yaml)。参照コード・assetはコピーしていない。
 実GitLabのOAuth登録・project権限、実機TalkBack、巨大MRの端末別profileはリリース前の確認対象。
 アプリ自体の配布ライセンスは未決定。
+
+
+## CR3-A / v0.9 Editing Preview
+
+プロジェクト作成とRepository編集を追加。Project → Repositoryからファイルを編集し、専用ブランチへ複数ファイルをコミットしてMRを作成できます。
+
+[リリース内容と制限](docs/RELEASE-0.9.md)。CR3-BのローカルGitエンジンは未搭載です。
