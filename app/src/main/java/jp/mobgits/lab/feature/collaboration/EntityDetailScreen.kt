@@ -55,10 +55,8 @@ import org.json.JSONObject
                         item { ConfirmAction(if (value.optBoolean("draft")) "Draftを解除" else "Draftにする", ready && value.text("state") == "opened") {
                             vm.save(mapOf("title" to if (value.optBoolean("draft")) value.text("title").replace(Regex("^(Draft:|WIP:)\\s*", RegexOption.IGNORE_CASE), "") else "Draft: ${value.text("title")}"))
                         } }
-                        item { ConfirmAction(if (state.approval?.optBoolean("user_has_approved") == true) "Unapprove" else "Approve", ready && state.approval != null && (state.approval?.optBoolean("user_can_approve") == true || state.approval?.optBoolean("user_has_approved") == true)) {
-                            vm.review(if (state.approval?.optBoolean("user_has_approved") == true) "unapprove" else "approve", vm.refs())
-                        } }
-                        item { val refs = vm.refs(); ConfirmAction("Merge", ready && refs.complete && value.optJSONObject("user")?.optBoolean("can_merge") == true && !value.optBoolean("draft") && value.text("detailed_merge_status") == "mergeable", "${value.text("source_branch")} → ${value.text("target_branch")}\n確認したSHA: ${refs.head.take(12)}") { vm.review("merge", refs) } }
+                        item { ApprovalAction(vm) }
+                        item { val refs = vm.refs(); ConfirmAction("Merge", ready && refs.complete && value.optJSONObject("user")?.optBoolean("can_merge") == true && !value.optBoolean("draft") && value.text("detailed_merge_status") == "mergeable", "${value.text("source_branch")} → ${value.text("target_branch")}\n確認したSHA: ${refs.head.take(12)}", identity = refs) { vm.review("merge", refs) } }
                     }
                     item { CommentEditor(vm) }
                 }
@@ -74,6 +72,7 @@ import org.json.JSONObject
                         Text("Stage: ${value.text("stage")}")
                         value.optJSONArray("artifacts")?.objects()?.forEach { Text("Artifact: ${it.text("filename")} (${it.optLong("size")} bytes)") }
                         OutlinedButton(onClick = vm::loadLog, enabled = ready) { Text(if (state.log.isEmpty()) "ログを読み込む" else "次のログ／更新") }
+                        TextButton(onClick = vm::resetLog, enabled = ready) { Text("ログを先頭から読み直す") }
                         Text("読み込み済み: ${state.logOffset} bytes（直近1MiBを表示）")
                     }
                     itemsIndexed(state.log) { _, chunk -> SelectionContainer { Text(chunk, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) } }

@@ -22,10 +22,20 @@ class MainActivity : FragmentActivity() {
     private val vm by viewModels<AppViewModel>()
     private var unlocked by mutableStateOf(false)
     private var lockError by mutableStateOf<String?>(null)
+    private lateinit var biometricPrompt: BiometricPrompt
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); enableEdgeToEdge(); handle(intent)
+        super.onCreate(savedInstanceState); enableEdgeToEdge()
+        biometricPrompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { unlocked = true; lockError = null }
+            override fun onAuthenticationError(code: Int, message: CharSequence) { lockError = message.toString() }
+        })
+        handle(intent)
         setContent {
             val state = vm.state
+            LaunchedEffect(state.settings.biometric) {
+                if (state.settings.biometric) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
             val dark = when (state.settings.theme) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
             val colors = if (state.settings.dynamic && Build.VERSION.SDK_INT >= 31) {
                 if (dark) dynamicDarkColorScheme(this) else dynamicLightColorScheme(this)
@@ -50,10 +60,7 @@ class MainActivity : FragmentActivity() {
         else DeepLinks.parse(data.toString())?.let { vm.deepLink(it.first, it.second) }
     }
     private fun unlock() {
-        BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { unlocked = true; lockError = null }
-            override fun onAuthenticationError(code: Int, message: CharSequence) { lockError = message.toString() }
-        }).authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("MobGitsをロック解除")
+        biometricPrompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("MobGitsをロック解除")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL).build())
     }
 }

@@ -43,9 +43,17 @@ class NetworkTest {
     }
     @Test fun successfulMutationInvalidatesOnlyThatAccountsCache() = runBlocking {
         val dao = FakeDao(); val remote = FakeRemote(); val repo = ResourceRepository(remote, dao)
-        repo.read("a", "/api/v4/user"); repo.read("b", "/api/v4/user")
+        repo.read("a", "/api/v4/projects/1/issues/1"); repo.read("a", "/api/v4/projects/1/issues/2"); repo.read("b", "/api/v4/projects/1/issues/1")
         repo.write("a", "/api/v4/projects/1/issues/1", "PUT", mapOf("title" to "edit"))
-        assertNull(dao.get("a", "/api/v4/user")); assertNotNull(dao.get("b", "/api/v4/user"))
+        assertNull(dao.get("a", "/api/v4/projects/1/issues/1")); assertNotNull(dao.get("a", "/api/v4/projects/1/issues/2")); assertNotNull(dao.get("b", "/api/v4/projects/1/issues/1"))
+    }
+    @Test fun chunkBoundariesDoNotCorruptJapaneseLogText() {
+        val bytes = ByteArray(32767) { 'a'.code.toByte() } + "漢字".toByteArray(Charsets.UTF_8)
+        val first = decodeLogChunk(bytes.copyOfRange(0, 32768), 0)
+        assertEquals(32767L, first.nextOffset)
+        val second = decodeLogChunk(bytes.copyOfRange(first.nextOffset.toInt(), bytes.size), first.nextOffset)
+        assertEquals(bytes.toString(Charsets.UTF_8), first.text + second.text)
+        assertTrue(second.end)
     }
     @Test fun commonErrorsDistinguishPermissionsConflictAndRateLimit() {
         assertEquals(FailureKind.AUTHENTICATION, ApiFailure.from(401).kind)
@@ -65,6 +73,9 @@ class NetworkTest {
         override suspend fun get(account: String, path: String) = values[account to path]
         override suspend fun put(resource: CachedResource) { values[resource.accountId to resource.path] = resource }
         override suspend fun clear(account: String) { values.keys.removeAll { it.first == account } }
+        override suspend fun invalidate(account: String, entity: String, collection: String) {
+            values.keys.removeAll { it.first == account && ((entity.isNotBlank() && (it.second == entity || it.second.startsWith("$entity/") || it.second.startsWith("$entity?"))) || it.second.startsWith("$collection?")) }
+        }
         override suspend fun prune(cutoff: Long) { }
         override suspend fun bound() { }
     }

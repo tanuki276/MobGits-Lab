@@ -1,37 +1,29 @@
-# MobGits Lab 認証設計
+# OAuth設定
 
-## 推奨: GitLab OAuth 2.0 + PKCE
+接続する各GitLabのApplications設定でpublic OAuth applicationを登録する。
 
-MobGits Lab はモバイルアプリ向けに OAuth 2.0 Authorization Code + PKCE を使います。
-クライアントシークレットはAPKに埋め込みません。
+- Redirect URI: `mobgits://oauth/callback`
+- Scope: `api`
+- Confidential: 無効
+- Client secret: 使用しない
 
-### GitLab.com 用 OAuth Application
+[GitLab OAuth provider](https://docs.gitlab.com/integration/oauth_provider/) / [PKCE API](https://docs.gitlab.com/api/oauth2/)
 
-1. GitLab の User Settings > Applications で OAuth Application を作成
-2. Redirect URI に `mobgits://oauth/callback` を設定
-3. Confidential のチェックを外す
-4. Scope は `api` を有効化
-5. 発行された Application ID を Gradle property `MOBGITS_GITLAB_CLIENT_ID` に設定
+GitLab.comのClient IDはGradle property `MOBGITS_GITLAB_CLIENT_ID` で渡す。
+Self-Managedは「GitLabアカウントを追加」→ 接続先の詳細・開発者設定に、そのserverのClient IDを登録する。
+base URLのサブパスとportを保持し、API URLは内部生成する。tokenの入力は不要。
 
-例: `~/.gradle/gradle.properties`
+## ログインと復帰
 
-```properties
-MOBGITS_GITLAB_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+System Browser、PKCE S256、state、callback完全一致、重複パラメーター拒否、10分TTLを使用する。
+途中状態・tokenはAndroid Keystore AES-GCMで暗号化保存する。browser遷移中のprocess death後もcallbackを処理する。
+成功したcallbackの再利用を拒否し、token交換後の `/user` 取得は暗号化した途中結果から再開できる。
+期限切れtokenはrefreshし、並行401ではrefresh tokenを重複使用しない。一時的な通信失敗でaccountを削除しない。
+旧PAT / 単一OAuth保存形式は破棄するため、OAuthで再ログインする。
 
-GitHub Actions ではビルド自体は Client ID なしでも通ります。配布APKでOAuthを有効にする場合は、CI側でGradle propertyを注入してください。
+## 運用上の条件
 
-## PAT
-
-セルフホストGitLabや開発時のフォールバックとして Personal Access Token ログインも残します。
-認証情報は Android Keystore の AES/GCM キーで暗号化して端末内に保存します。
-
-## セキュリティ方針
-
-- OAuth client secret をアプリへ埋め込まない
-- OAuth state を検証する
-- PKCE S256 を使用する
-- access token / refresh token は暗号化保存
-- OAuth access token は Bearer token として送信
-- PAT は PRIVATE-TOKEN ヘッダーとして送信
-- 平文HTTPのGitLabサーバーはサポートしない
+- 信頼されたHTTPS証明書が必要。企業CAが必要な配布では、そのCAを指定したNetwork Security Configを用意する。
+- 外部browserでGitLab側のSSO / MFA policyに従う。
+- Approve時のpassword再入力は承認dialogで対応し、保存しない。SAML強制等によりGitLabがAPI承認を拒否する場合はpolicyに従う。
+- 実GitLab.com / Self-Managedのapplication登録・権限確認は、TLS mock serverによるCIとは別途実施する。

@@ -20,8 +20,8 @@ import io.noties.markwon.ext.tables.TablePlugin
         Markwon.builder(view.context).usePlugin(TablePlugin.create(view.context)).build().setMarkdown(view, body)
     })
 }
-@Composable fun ConfirmAction(label: String, enabled: Boolean = true, message: String = "GitLab上に反映されます。", action: () -> Unit) {
-    var confirm by remember { mutableStateOf(false) }
+@Composable fun ConfirmAction(label: String, enabled: Boolean = true, message: String = "GitLab上に反映されます。", identity: Any? = message, action: () -> Unit) {
+    var confirm by remember(label, identity) { mutableStateOf(false) }
     OutlinedButton(onClick = { confirm = true }, enabled = enabled) { Text(label) }
     if (confirm) AlertDialog(onDismissRequest = { confirm = false }, title = { Text("$label しますか？") }, text = { Text(message) },
         confirmButton = { TextButton(onClick = { confirm = false; action() }, enabled = enabled) { Text(label) } },

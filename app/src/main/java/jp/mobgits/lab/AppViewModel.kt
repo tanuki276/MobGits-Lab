@@ -11,6 +11,7 @@ import jp.mobgits.lab.core.model.*
 import jp.mobgits.lab.core.network.*
 import jp.mobgits.lab.feature.collaboration.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 
 data class UiState(
@@ -37,7 +38,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         viewModelScope.launch { graph.preferences.settings.collect { state = state.copy(settings = it) } }
         viewModelScope.launch { graph.sessions.status.collect { state = state.copy(session = it) } }
         viewModelScope.launch {
-            try { graph.initialize(); state = state.copy(directory = graph.preferences.snapshot()); reload() }
+            try { graph.initialize(); jp.mobgits.lab.feature.inbox.Notifications.schedule(getApplication<Application>(), graph.preferences.settings.first().enabled); state = state.copy(directory = graph.preferences.snapshot()); reload() }
             catch (e: Exception) { if (e is CancellationException) throw e; state = state.copy(loading = false, error = e.message) }
         }
     }
@@ -61,6 +62,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
     fun filter(value: ListFilter) { state = state.copy(filter = value, page = 1, entries = emptyList()); reload() }
     fun panel(value: String) { state = state.copy(panel = value, entries = emptyList(), page = 1, next = null); reload() }
     fun more() { state.next?.let { state = state.copy(page = it); reload(append = state.panel != "diffs") } }
+    fun jumpDiff(page: Int) { if (page > 0 && page <= 10000 && !state.loading) { state = state.copy(page = page, entries = emptyList()); reload() } }
     fun previousDiff() { if (state.page > 1) { state = state.copy(page = state.page - 1, entries = emptyList()); reload() } }
     fun reload(append: Boolean = false) {
         val account = state.directory.activeAccount?.id
@@ -114,7 +116,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         }
     }
     fun save(fields: Map<String, String>, create: Boolean = false) = mutate("保存しました") { id, d -> use.save(id, d, fields, create); Unit }
-    fun draftKey(thread: String?, position: ReviewPosition?) = "draft:${state.directory.activeAccount?.id}:${state.route.encode()}:$thread:$position"
+    fun draftKey(thread: String?, position: ReviewPosition?) = commentDraftKey(state.directory.activeAccount?.id, state.route, thread, position)
     fun draft(key: String): String = saved[key] ?: ""
     fun setDraft(key: String, body: String) { saved[key] = body }
     fun comment(body: String, thread: String? = null, position: ReviewPosition? = null) {
@@ -125,7 +127,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         }
     }
     fun resolve(thread: String, value: Boolean) = mutate("スレッドを更新しました") { id, d -> use.resolve(id, d, thread, value) }
-    fun review(action: String, refs: DiffRefs) = mutate("操作が完了しました") { id, d -> use.review(id, d, refs, action) }
+    fun review(action: String, refs: DiffRefs, approvalPassword: String? = null) = mutate("操作が完了しました") { id, d -> use.review(id, d, refs, action, approvalPassword) }
     fun jobAction(action: String) = mutate("ジョブを更新しました") { id, d ->
         val result = use.jobAction(id, d, action)
         if (d.kind == "job" && action == "retry") {
@@ -134,6 +136,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         }
     }
     fun done(todo: Long) = mutate("To-Doを完了しました") { id, _ -> use.done(id, todo) }
+    fun resetLog() { state = state.copy(log = emptyList(), logOffset = 0, logEnd = false); loadLog() }
     fun loadLog() {
         if (state.loading || state.submitting) return
         val id = runCatching { account() }.getOrElse { return }; val d = state.route; val current = epoch
@@ -141,7 +144,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         viewModelScope.launch {
             try {
                 val chunk = use.log(id, d, offset)
-                if (current == epoch) state = state.copy(loading = false, log = (state.log + chunk.text).takeLast(32), logOffset = chunk.nextOffset, logEnd = chunk.end)
+                if (current == epoch) state = state.copy(loading = false, log = (if (chunk.text.isNotEmpty()) state.log + chunk.text else state.log).takeLast(32), logOffset = chunk.nextOffset, logEnd = chunk.end)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (current == epoch) state = state.copy(loading = false, error = e.message) }
         }
@@ -163,6 +166,11 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
     }
     fun flag(key: String, value: Boolean) = authOperation { graph.preferences.setFlag(key, value) }
     fun theme(value: String) = authOperation { graph.preferences.theme(value) }
+    fun checkApi() = authOperation {
+        state = state.copy(apiStatus = "確認中")
+        try { use.checkApi(account()); state = state.copy(apiStatus = "接続成功") }
+        catch (e: Exception) { state = state.copy(apiStatus = "接続失敗"); throw e }
+    }
     fun clearCache() = authOperation { state.directory.activeAccount?.let { graph.resources.clear(it.id) }; state = state.copy(notice = "ローカルキャッシュを削除しました") }
     private fun authOperation(action: suspend () -> Unit) {
         viewModelScope.launch { try { action() } catch (e: CancellationException) { throw e } catch (e: Exception) { state = state.copy(loading = false, error = e.message) } }

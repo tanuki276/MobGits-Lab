@@ -13,7 +13,13 @@ GitLab.com / Self-Managed GitLabの両方で、確認・レビュー・Issue管�
 
 原則CR1 → CR2 → CR3-A → 必要条件を満たしてCR3-B。v1.0は機能数ではなく日常利用で壊れないことを条件にする。
 
-## 現状と移行
+## 実装状況
+
+CR1基盤・画面移行はPR #4〜#8で統合済み。CR2の仕上げは `feat/cr2-hardening` で継続する。
+現在の機能・外部依存・検証チェックリストは [IMPLEMENTATION.md](IMPLEMENTATION.md) を正とする。
+以下の棚卸しは開始時点の記録として残す。
+
+## 開始時点の現状と移行
 
 2026-10-24時点の開始点は `0291ff65f9af93c5a999152789cc7bae6b9aec74`。
 このコミットには既存のOAuth/PAT、プロジェクト一覧、MR差分・行コメント・Approve/Merge、Job一覧・ログ・Retry/Cancelがある。
@@ -112,23 +118,23 @@ Self-ManagedのOAuth applicationはserverごとの登録が必要。client IDの
 
 | ID | タスク | 領域 | 依存 | 状態 |
 |---|---|---|---|---|
-| CR1-01 | Auth model整理 | Core | — | 未着手 |
-| CR1-02 | OAuth PKCE SessionManager | Auth | 01 | 未着手 |
-| CR1-03 | SecureTokenStore | Auth | 01 | 未着手 |
-| CR1-04 | OAuth process-death復帰 | Auth | 02,03 | 未着手 |
-| CR1-05 | OkHttp / Retrofit導入 | Network | — | 未着手 |
-| CR1-06 | AuthInterceptor | Network/Auth | 02,05 | 未着手 |
-| CR1-07 | API error model統一 | Network | 05 | 未着手 |
-| CR1-08 | Repository layer | Data | 05 | 未着手 |
-| CR1-09 | Room | Data | — | 未着手 |
-| CR1-10 | DataStore設定保存 | Data | — | 未着手 |
-| CR1-11 | GitLabServer管理 | Settings | 10 | 未着手 |
-| CR1-12 | Account管理 | Settings | 02,10 | 未着手 |
-| CR1-13 | Account switcher | UI | 12 | 未着手 |
-| CR1-14 | Settings画面 | UI | 10,11,12 | 未着手 |
-| CR1-15 | PAT UI/処理削除 | Auth | 02 | 未着手 |
-| CR1-16 | Reference repo設定 | Docs | — | 実装中 |
-| CR1-17 | Unit / UI tests | QA | 全体 | 未着手 |
+| CR1-01 | Auth model整理 | Core | — | 統合済（#5） |
+| CR1-02 | OAuth PKCE SessionManager | Auth | 01 | 実装・統合済（#6〜#8） |
+| CR1-03 | SecureTokenStore | Auth | 01 | 実装・統合済（#6〜#8） |
+| CR1-04 | OAuth process-death復帰 | Auth | 02,03 | 実装・統合済（#6〜#8） |
+| CR1-05 | OkHttp / Retrofit導入 | Network | — | 実装・統合済（#6〜#8） |
+| CR1-06 | AuthInterceptor | Network/Auth | 02,05 | 実装・統合済（#6〜#8） |
+| CR1-07 | API error model統一 | Network | 05 | 実装・統合済（#6〜#8） |
+| CR1-08 | Repository layer | Data | 05 | 実装・統合済（#6〜#8） |
+| CR1-09 | Room | Data | — | 実装・統合済（#6〜#8） |
+| CR1-10 | DataStore設定保存 | Data | — | 実装・統合済（#6〜#8） |
+| CR1-11 | GitLabServer管理 | Settings | 10 | 実装・統合済（#6〜#8） |
+| CR1-12 | Account管理 | Settings | 02,10 | 実装・統合済（#6〜#8） |
+| CR1-13 | Account switcher | UI | 12 | 実装・統合済（#6〜#8） |
+| CR1-14 | Settings画面 | UI | 10,11,12 | 実装・統合済（#6〜#8） |
+| CR1-15 | PAT UI/処理削除 | Auth | 02 | 実装・統合済（#6〜#8） |
+| CR1-16 | Reference repo設定 | Docs | — | 統合済（#4） |
+| CR1-17 | Unit / UI tests | QA | 全体 | phone/tablet・force-stop検証済（CI 40105972389） |
 
 ### CR1 Definition of Done
 
@@ -171,26 +177,26 @@ target type / idを解析して対象へ遷移する。Android notificationも�
 
 | ID | タスク | 状態 |
 |---|---|---|
-| CR2-01 | Issue repository | 未着手 |
-| CR2-02 | Issue list | 未着手 |
-| CR2-03 | Issue detail | 未着手 |
-| CR2-04 | Issue create/edit | 未着手 |
-| CR2-05 | Issue comments | 未着手 |
-| CR2-06 | MR repository | 未着手 |
-| CR2-07 | MR overview | 未着手 |
-| CR2-08 | Diff parser/model | 移行対象の実装あり |
-| CR2-09 | Diff viewer | 遅延ロード未対応 |
-| CR2-10 | Inline discussions | reply/resolve未対応 |
-| CR2-11 | Approve/unapprove | unapprove未対応 |
-| CR2-12 | Merge flow | 移行・実機検証が必要 |
-| CR2-13 | Pipeline detail | 既存はJob一覧のみ |
-| CR2-14 | Job detail | 移行対象の実装あり |
-| CR2-15 | Job logs | chunk未対応 |
-| CR2-16 | Retry/cancel | 移行・実機検証が必要 |
-| CR2-17 | Inbox分類 | 未着手 |
-| CR2-18 | Deep Link | OAuth callback以外は未対応 |
-| CR2-19 | Android notification | 未着手 |
-| CR2-20 | Tests/performance | 単体テストの一部のみ |
+| CR2-01 | Issue repository | 実装済。phone/tablet CI成功（#9） |
+| CR2-02 | Issue list | 実装済。phone/tablet CI成功（#9） |
+| CR2-03 | Issue detail | 実装済。phone/tablet CI成功（#9） |
+| CR2-04 | Issue create/edit | 実装済。phone/tablet CI成功（#9） |
+| CR2-05 | Issue comments | 実装済。phone/tablet CI成功（#9） |
+| CR2-06 | MR repository | 実装済。phone/tablet CI成功（#9） |
+| CR2-07 | MR overview | 実装済。phone/tablet CI成功（#9） |
+| CR2-08 | Diff parser/model | 実装済。phone/tablet CI成功（#9） |
+| CR2-09 | Diff viewer | 実装済。phone/tablet CI成功（#9） |
+| CR2-10 | Inline discussions | 実装済。phone/tablet CI成功（#9） |
+| CR2-11 | Approve/unapprove | 実装済。phone/tablet CI成功（#9） |
+| CR2-12 | Merge flow | 実装済。phone/tablet CI成功（#9） |
+| CR2-13 | Pipeline detail | 実装済。phone/tablet CI成功（#9） |
+| CR2-14 | Job detail | 実装済。phone/tablet CI成功（#9） |
+| CR2-15 | Job logs | 実装済。phone/tablet CI成功（#9） |
+| CR2-16 | Retry/cancel | 実装済。phone/tablet CI成功（#9） |
+| CR2-17 | Inbox分類 | 実装済。phone/tablet CI成功（#9） |
+| CR2-18 | Deep Link | 実装済。phone/tablet CI成功（#9） |
+| CR2-19 | Android notification | 定期同期実装。FCM配信基盤は外部設定が必要 |
+| CR2-20 | Tests/performance | Unit/UIあり。実機profileはリリース判定項目 |
 
 CR2 DoD:
 

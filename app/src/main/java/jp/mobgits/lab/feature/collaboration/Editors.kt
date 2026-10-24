@@ -96,7 +96,40 @@ import org.json.JSONObject
     var body by rememberSaveable(draftKey) { mutableStateOf(vm.draft(draftKey)) }
     LaunchedEffect(state.completedDraft) { if (state.completedDraft == draftKey) { body = ""; finished?.invoke() } }
     Column(Modifier.padding(12.dp)) {
+        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (state.needsRefresh) {
+            Text("差分が変わった場合は、下書きを保持したまま行を選び直してください。")
+            TextButton(onClick = { vm.reload() }, enabled = !state.loading && !state.submitting) { Text("再読み込み") }
+        }
         OutlinedTextField(body, { body = it; vm.setDraft(draftKey, it) }, label = { Text(if (thread == null) "コメント（Markdown）" else "このスレッドへ返信") }, minLines = 3, enabled = !state.submitting, modifier = Modifier.fillMaxWidth().testTag("comment-body"))
         Button(onClick = { vm.comment(body, thread, position) }, enabled = body.isNotBlank() && !state.submitting && !state.offline && !state.loading && !state.needsRefresh) { Text("投稿") }
     }
+}
+
+@Composable fun ApprovalAction(vm: AppViewModel) {
+    val state = vm.state
+    val refs = vm.refs()
+    val approved = state.approval?.optBoolean("user_has_approved") == true
+    val ready = !state.loading && !state.submitting && !state.offline && !state.needsRefresh && refs.complete && state.detail?.text("state") == "opened" &&
+        (approved || state.approval?.optBoolean("user_can_approve") == true)
+    val needsPassword = !approved && state.approval?.optBoolean("require_password_to_approve") == true
+    if (!needsPassword) {
+        ConfirmAction(if (approved) "Unapprove" else "Approve", ready, "確認したSHA: " + refs.head.take(12), identity = refs) {
+            vm.review(if (approved) "unapprove" else "approve", refs)
+        }
+        return
+    }
+    var show by remember(refs) { mutableStateOf(false) }
+    var password by remember(refs) { mutableStateOf("") }
+    OutlinedButton(onClick = { show = true }, enabled = ready) { Text("Approve") }
+    if (show) AlertDialog(onDismissRequest = { show = false; password = "" }, title = { Text("承認時の再認証") }, text = {
+        Column {
+            Text("確認したSHA: " + refs.head.take(12))
+            Text("このprojectは承認時にGitLabパスワードを要求しています。入力内容は保存しません。")
+            OutlinedTextField(password, { password = it }, label = { Text("GitLabパスワード") }, singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+        }
+    }, confirmButton = { TextButton(enabled = ready && password.isNotBlank(), onClick = {
+        vm.review("approve", refs, password); password = ""; show = false
+    }) { Text("Approve") } }, dismissButton = { TextButton(onClick = { show = false; password = "" }) { Text("戻る") } })
 }

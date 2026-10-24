@@ -9,6 +9,8 @@ data class CachedResource(val accountId: String, val path: String, val json: Str
     @Query("SELECT * FROM resource_cache WHERE accountId = :account AND path = :path") suspend fun get(account: String, path: String): CachedResource?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(resource: CachedResource)
     @Query("DELETE FROM resource_cache WHERE accountId = :account") suspend fun clear(account: String)
+    @Query("DELETE FROM resource_cache WHERE accountId = :account AND ((:entity != '' AND (path = :entity OR substr(path, 1, length(:entity) + 1) = :entity || '/' OR substr(path, 1, length(:entity) + 1) = :entity || '?')) OR substr(path, 1, length(:collection) + 1) = :collection || '?')")
+    suspend fun invalidate(account: String, entity: String, collection: String)
     @Query("DELETE FROM resource_cache WHERE savedAt < :cutoff") suspend fun prune(cutoff: Long)
     @Query("DELETE FROM resource_cache WHERE rowid NOT IN (SELECT rowid FROM resource_cache ORDER BY savedAt DESC LIMIT 300)") suspend fun bound()
 }

@@ -83,7 +83,7 @@ class GitLabTransport(accounts: AccountRepository, sessions: OAuthSessionManager
                     check(start == offset) { "ログ位置を検証できませんでした" }
                 }
                 val bytes = it.readNBytesCompat(32768)
-                LogChunk(bytes.toString(Charsets.UTF_8), offset + bytes.size, bytes.size < 32768)
+                decodeLogChunk(bytes, offset)
             }
         }
         } catch (error: ApiFailure) { if (error.status == 416) LogChunk("", offset, true) else throw error }
@@ -110,4 +110,19 @@ private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
     val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
     while (output.size() < limit) { val n = read(buffer, 0, minOf(buffer.size, limit - output.size())); if (n < 0) break; output.write(buffer, 0, n) }
     return output.toByteArray()
+}
+
+internal fun decodeLogChunk(bytes: ByteArray, offset: Long): LogChunk {
+    val end = bytes.size < 32768
+    var consumed = bytes.size
+    if (!end && bytes.isNotEmpty()) {
+        var lead = bytes.lastIndex
+        while (lead >= 0 && (bytes[lead].toInt() and 0xC0) == 0x80) lead--
+        if (lead >= 0) {
+            val first = bytes[lead].toInt() and 0xFF
+            val length = when { (first and 0xF8) == 0xF0 -> 4; (first and 0xF0) == 0xE0 -> 3; (first and 0xE0) == 0xC0 -> 2; else -> 1 }
+            if (lead + length > bytes.size) consumed = lead
+        }
+    }
+    return LogChunk(bytes.copyOfRange(0, consumed).toString(Charsets.UTF_8), offset + consumed, end)
 }
