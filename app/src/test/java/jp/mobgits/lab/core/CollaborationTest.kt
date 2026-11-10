@@ -81,10 +81,24 @@ class CollaborationTest {
         assertEquals(7L, todoDestination(json)?.id)
         assertEquals("レビュー依頼", todoCategory(json))
     }
+    @Test fun projectSearchAndStarredFilterAreEncodedAndAccountScoped() = runBlocking {
+        val fake = Fake(mutableListOf(Resource("[]", false)))
+        CollaborationUseCase(fake).list("account-a", Destination("projects"), 2,
+            ListFilter(search = "日本語 & +", starred = true))
+        assertEquals("/api/v4/projects?membership=true&simple=true&order_by=last_activity_at&search=%E6%97%A5%E6%9C%AC%E8%AA%9E%20%26%20%2B&starred=true&per_page=20&page=2", fake.reads.single())
+        assertEquals(listOf("account-a"), fake.accounts)
+    }
+    @Test fun mergedMrsPreserveSearchAndAssigneeScope() = runBlocking {
+        val fake = Fake(mutableListOf(Resource("[]", false)))
+        CollaborationUseCase(fake).list("a", Destination("mrs", 42), 1,
+            ListFilter(state = "merged", scope = "assigned_to_me", search = "fix"))
+        assertEquals("/api/v4/projects/42/merge_requests?state=merged&scope=assigned_to_me&search=fix&per_page=20&page=1", fake.reads.single())
+    }
     private data class Write(val path: String, val method: String, val fields: Map<String, String>)
     private class Fake(val responses: MutableList<Resource>) : Resources {
+        val accounts = mutableListOf<String>()
         val reads = mutableListOf<String>(); val writes = mutableListOf<Write>()
-        override suspend fun read(account: String, path: String, cached: Boolean): Resource { reads += path; return responses.removeAt(0) }
+        override suspend fun read(account: String, path: String, cached: Boolean): Resource { accounts += account; reads += path; return responses.removeAt(0) }
         override suspend fun write(account: String, path: String, method: String, fields: Map<String, String>): String { writes += Write(path, method, fields); return "{}" }
         override suspend fun log(account: String, project: Long, job: Long, offset: Long) = LogChunk("", offset, true)
         override suspend fun clear(account: String) { }

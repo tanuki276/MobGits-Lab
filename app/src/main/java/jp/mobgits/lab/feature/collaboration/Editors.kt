@@ -13,16 +13,22 @@ import jp.mobgits.lab.core.network.*
 import org.json.JSONObject
 
 @Composable fun IssueFilters(vm: AppViewModel) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var labels by rememberSaveable { mutableStateOf("") }
-    var assignee by rememberSaveable { mutableStateOf("") }
-    var milestone by rememberSaveable { mutableStateOf("") }
-    TextButton(onClick = { expanded = !expanded }) { Text("絞り込み（ラベル・担当者・マイルストーン）") }
-    if (expanded) Column(Modifier.padding(horizontal = 16.dp)) {
-        OutlinedTextField(labels, { labels = it }, label = { Text("ラベル（カンマ区切り）") })
-        OutlinedTextField(assignee, { assignee = it }, label = { Text("担当者のユーザー名") })
-        OutlinedTextField(milestone, { milestone = it }, label = { Text("マイルストーン名") })
-        TextButton(onClick = { vm.filter(vm.state.filter.copy(labels = labels, assignee = assignee, milestone = milestone)) }) { Text("適用") }
+    val state = vm.state
+    val scope = "${state.directory.activeAccount?.id}:${state.route.encode()}"
+    var expanded by rememberSaveable(scope) { mutableStateOf(false) }
+    var labels by rememberSaveable(scope, state.filter.labels) { mutableStateOf(state.filter.labels) }
+    var assignee by rememberSaveable(scope, state.filter.assignee) { mutableStateOf(state.filter.assignee) }
+    var milestone by rememberSaveable(scope, state.filter.milestone) { mutableStateOf(state.filter.milestone) }
+    Column {
+        TextButton(onClick = { expanded = !expanded }) { Text("絞り込み（ラベル・担当者・マイルストーン）") }
+        if (expanded) Column(Modifier.padding(horizontal = 16.dp)) {
+            OutlinedTextField(labels, { labels = it }, label = { Text("ラベル（カンマ区切り）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(assignee, { assignee = it }, label = { Text("担当者のユーザー名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(milestone, { milestone = it }, label = { Text("マイルストーン名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            TextButton(enabled = !state.submitting, onClick = {
+                vm.filter(state.filter.copy(labels = labels.trim(), assignee = assignee.trim(), milestone = milestone.trim()))
+            }) { Text("適用") }
+        }
     }
 }
 
