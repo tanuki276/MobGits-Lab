@@ -31,6 +31,7 @@ class ListPagingTest {
         }
         fun ready() = compose.waitUntil(15000) { !vm.state.loading }
         try {
+            compose.setContent { androidx.compose.material3.Text("Paging test") }
             ready()
             compose.runOnIdle { vm.more() }
             ready()

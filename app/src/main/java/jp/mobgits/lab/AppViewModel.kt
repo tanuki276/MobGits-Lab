@@ -65,7 +65,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         if (state.submitting) return
         state = state.copy(filter = value, page = 1, next = null, entries = emptyList()); reload()
     }
-    fun panel(value: String) { state = state.copy(panel = value, entries = emptyList(), page = 1, next = null); reload() }
+    fun panel(value: String) { if (state.submitting) return; state = state.copy(panel = value, entries = emptyList(), page = 1, next = null); reload() }
     fun more() {
         if (state.loading || state.submitting) return
         state.next?.let { reload(append = state.panel != "diffs", requestedPage = it) }

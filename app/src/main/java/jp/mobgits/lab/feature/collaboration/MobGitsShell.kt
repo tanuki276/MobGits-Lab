@@ -161,24 +161,24 @@ fun MobGitsShell(vm: AppViewModel, open: (String) -> Unit, biometric: (Boolean) 
                 else -> "該当する項目はありません。"
             })
         }
-            itemsIndexed(state.entries, key = { index, value -> "${value.optLong("id")}-${value.text("path")}-${index}" }) { _, value ->
-                if (d.kind == "inbox") InboxCard(value, vm)
-                else Card(onClick = {
-                    val next = when(d.kind) {
-                        "home", "projects", "search" -> Destination("project", value.getLong("id"))
-                        "issues" -> Destination("issue", d.project, value.getLong("iid"))
-                        "mrs" -> Destination("mr", d.project, value.getLong("iid"))
-                        "pipelines" -> Destination("pipeline", d.project, value.getLong("id"))
-                        "tree" -> d.copy(kind = if (value.text("type") == "tree") "tree" else "file", path = value.text("path"))
-                        else -> d
-                    }; vm.navigate(next)
-                }, modifier = Modifier.fillMaxWidth()) {
-                    ListItem(headlineContent = { Text(value.text("title").ifBlank { value.text("name") }.ifBlank { "#${value.optLong("id")}" }) },
-                        supportingContent = { Text(value.text("path_with_namespace").ifBlank { value.text("state") }.ifBlank { "${value.text("ref")} ${value.text("status")}" }) },
-                        leadingContent = { value.text("avatar_url").takeIf { it.startsWith("https://") }?.let { coil.compose.AsyncImage(it, null, Modifier.size(40.dp)) } })
-                }
+        itemsIndexed(state.entries, key = { index, value -> "${value.optLong("id")}-${value.text("path")}-${index}" }) { _, value ->
+            if (d.kind == "inbox") InboxCard(value, vm)
+            else Card(onClick = {
+                val next = when(d.kind) {
+                    "home", "projects", "search" -> Destination("project", value.getLong("id"))
+                    "issues" -> Destination("issue", d.project, value.getLong("iid"))
+                    "mrs" -> Destination("mr", d.project, value.getLong("iid"))
+                    "pipelines" -> Destination("pipeline", d.project, value.getLong("id"))
+                    "tree" -> d.copy(kind = if (value.text("type") == "tree") "tree" else "file", path = value.text("path"))
+                    else -> d
+                }; vm.navigate(next)
+            }, modifier = Modifier.fillMaxWidth()) {
+                ListItem(headlineContent = { Text(value.text("title").ifBlank { value.text("name") }.ifBlank { "#${value.optLong("id")}" }) },
+                    supportingContent = { Text(value.text("path_with_namespace").ifBlank { value.text("state") }.ifBlank { "${value.text("ref")} ${value.text("status")}" }) },
+                    leadingContent = { value.text("avatar_url").takeIf { it.startsWith("https://") }?.let { coil.compose.AsyncImage(it, null, Modifier.size(40.dp)) } })
             }
-            if (state.next != null) item { OutlinedButton(onClick = vm::more, enabled = !state.loading && !state.submitting, modifier = Modifier.fillMaxWidth()) { Text(if (state.loading) "読み込み中…" else "さらに読み込む") } }
+        }
+        if (state.next != null) item { OutlinedButton(onClick = vm::more, enabled = !state.loading && !state.submitting, modifier = Modifier.fillMaxWidth()) { Text(if (state.loading) "読み込み中…" else "さらに読み込む") } }
     }
 }
 
@@ -188,19 +188,19 @@ fun ListSearchBar(appliedQuery: String, enabled: Boolean = true, onSearch: (Stri
     val keyboard = LocalSoftwareKeyboardController.current
     val submit = { keyboard?.hide(); onSearch(query.trim()) }
     Column {
-    OutlinedTextField(
-        value = query, onValueChange = { query = it }, enabled = enabled,
-        label = { Text("検索") }, placeholder = { Text("キーワードを入力") },
-        singleLine = true, modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { submit() }),
-        leadingIcon = { Icon(Icons.Default.Search, null) },
-        trailingIcon = {
-            if (query.isNotEmpty()) IconButton(onClick = { query = ""; onSearch("") }, enabled = enabled) {
-                Icon(Icons.Default.Close, "検索をクリア")
+        OutlinedTextField(
+            value = query, onValueChange = { query = it }, enabled = enabled,
+            label = { Text("検索") }, placeholder = { Text("キーワードを入力") },
+            singleLine = true, modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { submit() }),
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) IconButton(onClick = { query = ""; onSearch("") }, enabled = enabled) {
+                    Icon(Icons.Default.Close, "検索をクリア")
+                }
             }
-        }
-    )
-    TextButton(onClick = submit, enabled = enabled) { Text("検索する") }
+        )
+        TextButton(onClick = submit, enabled = enabled) { Text("検索する") }
     }
 }
