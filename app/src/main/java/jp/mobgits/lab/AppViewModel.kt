@@ -49,7 +49,7 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         if (state.submitting) return
         if (root) history.clear() else history.add(state.route.encode())
         saved["history"] = history; saved["route"] = route.encode()
-        state = state.copy(route = route, detail = null, entries = emptyList(), panel = "overview", page = 1, next = null,
+        state = state.copy(route = route, detail = null, approval = null, offline = false, needsRefresh = false, entries = emptyList(), panel = "overview", page = 1, next = null,
             error = null, notice = null, filter = ListFilter(), file = null, log = emptyList(), logOffset = 0, logEnd = false)
         reload()
     }
@@ -61,18 +61,26 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
         navigate(target, root = true)
         history.addAll(remaining); saved["history"] = history
     }
-    fun filter(value: ListFilter) { state = state.copy(filter = value, page = 1, entries = emptyList()); reload() }
+    fun filter(value: ListFilter) {
+        if (state.submitting) return
+        state = state.copy(filter = value, page = 1, next = null, entries = emptyList()); reload()
+    }
     fun panel(value: String) { state = state.copy(panel = value, entries = emptyList(), page = 1, next = null); reload() }
-    fun more() { state.next?.let { state = state.copy(page = it); reload(append = state.panel != "diffs") } }
-    fun jumpDiff(page: Int) { if (page > 0 && page <= 10000 && !state.loading) { state = state.copy(page = page, entries = emptyList()); reload() } }
-    fun previousDiff() { if (state.page > 1) { state = state.copy(page = state.page - 1, entries = emptyList()); reload() } }
-    fun reload(append: Boolean = false) {
+    fun more() {
+        if (state.loading || state.submitting) return
+        state.next?.let { reload(append = state.panel != "diffs", requestedPage = it) }
+    }
+    fun jumpDiff(page: Int) { if (page > 0 && page <= 10000 && !state.loading) { reload(requestedPage = page) } }
+    fun previousDiff() { if (state.page > 1 && !state.loading) { reload(requestedPage = state.page - 1) } }
+    fun reload(append: Boolean = false, requestedPage: Int? = null) {
+        if (state.submitting) return
         val account = state.directory.activeAccount?.id
         val d = state.route
         val current = ++epoch; loadJob?.cancel()
         if (account == null || d.kind in setOf("settings", "create-project", "repository")) { state = state.copy(loading = false); return }
         state = state.copy(loading = true, error = null)
-        val start = state
+        // Commit the requested page only after success so a failed page can be retried.
+        val start = state.copy(page = requestedPage ?: if (state.panel == "diffs") state.page else 1)
         loadJob = viewModelScope.launch {
             try {
                 var result = start
@@ -92,12 +100,12 @@ class AppViewModel @JvmOverloads constructor(app: Application, private val saved
                                 val refreshed = use.detail(account, d)
                                 check(use.refs(detail.value) == use.refs(refreshed.value)) { "差分が更新されました。再読み込みしてください" }
                             }
-                            result = result.copy(entries = if (append) start.entries + values.entries else values.entries, next = values.next, offline = detail.offline || values.offline)
+                            result = result.copy(entries = if (append) start.entries + values.entries else values.entries, next = values.next, offline = detail.offline || values.offline || (append && start.offline))
                         }
                     }
                     else -> {
                         val values = use.list(account, d, start.page, start.filter)
-                        result = result.copy(entries = if (append) start.entries + values.entries else values.entries, next = values.next, offline = values.offline)
+                        result = result.copy(entries = if (append) start.entries + values.entries else values.entries, next = values.next, offline = values.offline || (append && start.offline))
                     }
                 }
                 if (current == epoch) state = result.copy(directory = state.directory, settings = state.settings, session = state.session,

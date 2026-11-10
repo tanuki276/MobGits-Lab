@@ -5,12 +5,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import jp.mobgits.lab.feature.collaboration.ConfirmAction
+import jp.mobgits.lab.feature.collaboration.ListSearchBar
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
 class ComposeFlowTest {
     @get:Rule val compose = createComposeRule()
+    @Test fun searchSupportsKeyboardClearAndExternalReset() {
+        val applied = mutableStateOf("")
+        var submitted = ""
+        compose.setContent { MaterialTheme {
+            ListSearchBar(applied.value) { submitted = it; applied.value = it }
+        } }
+        compose.onNode(hasSetTextAction()).performTextInput("  日本語  ")
+        compose.onNode(hasSetTextAction()).performImeAction()
+        compose.runOnIdle { assertEquals("日本語", submitted) }
+        compose.onNodeWithContentDescription("検索をクリア").performClick()
+        compose.runOnIdle { assertEquals("", submitted); applied.value = "restored" }
+        compose.onNode(hasSetTextAction()).assertTextContains("restored")
+        compose.runOnIdle { applied.value = "" }
+        compose.onNodeWithContentDescription("検索をクリア").assertDoesNotExist()
+    }
     @Test fun destructiveActionRequiresConfirmationAndCanBeDismissed() {
         var calls = 0
         compose.setContent { MaterialTheme { ConfirmAction("Merge") { calls++ } } }

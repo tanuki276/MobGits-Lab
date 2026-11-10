@@ -13,7 +13,7 @@ data class Destination(val kind: String = "home", val project: Long = 0, val id:
         fun decode(raw: String) = JSONObject(raw).let { Destination(it.getString("kind"), it.optLong("project"), it.optLong("id"), it.optString("path"), it.optString("ref", "main")) }
     }
 }
-data class ListFilter(val state: String = "opened", val scope: String = "all", val search: String = "", val labels: String = "", val assignee: String = "", val milestone: String = "")
+data class ListFilter(val state: String = "opened", val scope: String = "all", val search: String = "", val labels: String = "", val assignee: String = "", val milestone: String = "", val starred: Boolean = false)
 data class EntityPage(val entries: List<JSONObject>, val next: Int?, val offline: Boolean)
 data class Detail(val value: JSONObject, val offline: Boolean)
 
@@ -30,7 +30,8 @@ class CollaborationUseCase(private val data: Resources) {
     suspend fun list(account: String, d: Destination, page: Int, filter: ListFilter = ListFilter()): EntityPage = withContext(Dispatchers.Default) {
         require(page > 0)
         val endpoint = when (d.kind) {
-            "home", "projects" -> "/api/v4/projects?membership=true&simple=true&order_by=last_activity_at"
+            "home", "projects" -> "/api/v4/projects?membership=true&simple=true&order_by=last_activity_at&search=${query(filter.search)}" +
+                (if (filter.starred) "&starred=true" else "")
             "search" -> "/api/v4/projects?search=${query(filter.search)}&simple=true"
             "inbox" -> "/api/v4/todos?state=pending"
             "issues" -> "${root(d)}/issues?state=${query(filter.state)}&scope=${query(filter.scope)}&search=${query(filter.search)}&labels=${query(filter.labels)}" +

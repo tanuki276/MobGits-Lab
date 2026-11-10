@@ -39,6 +39,7 @@ class IssueFlowTest {
             compose.onNodeWithTag("issue-description").performTextInput("**Markdown**")
             compose.onNodeWithText("保存", useUnmergedTree = true).performClick()
             compose.waitUntil(15000) { fake.created && !vm.state.loading && !vm.state.submitting }
+            compose.onNodeWithTag("entity-list").performScrollToNode(hasText("Created issue"))
             compose.onNodeWithText("Created issue").performClick()
             compose.waitUntil(15000) { vm.state.detail != null && !vm.state.loading }
             compose.onNodeWithTag("entity-detail-list").performScrollToNode(hasTestTag("comment-body"))
